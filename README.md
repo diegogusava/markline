@@ -18,7 +18,8 @@ Every push to `main` is built by GitHub Actions for Linux and Windows and attach
 
 | Platform | Asset |
 |----------|-------|
-| Linux | `*.AppImage` (`chmod +x` it) or `.deb` |
+| Arch Linux | `*.pkg.tar.zst` (`sudo pacman -U` it). Uses the system WebKit, so it works on Wayland. |
+| Other Linux | `*.AppImage` (`chmod +x` it) or `.deb` |
 | Windows | `*-setup.exe` or `.msi` |
 
 If the release is missing, check the **Actions** tab for a failed build. Re-run it by pushing to `main` or using **Run workflow**.
