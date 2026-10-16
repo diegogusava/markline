@@ -8,6 +8,7 @@ license=('custom')
 depends=('webkit2gtk-4.1' 'gtk3')
 makedepends=('rust' 'nodejs' 'npm')
 source=()
+options=('!debug')
 
 build() {
   cd "$startdir"
