@@ -1,0 +1,1 @@
+{"name":"markline","version":"0.1.0","private":true,"scripts":{"build":"node ../build-app.js && tauri build","dev":"node ../build-app.js && tauri dev"},"devDependencies":{"@tauri-apps/cli":"^2"},"dependencies":{"marked":"^4.3.0","turndown":"^7.1.2","turndown-plugin-gfm":"^1.0.2"}}
