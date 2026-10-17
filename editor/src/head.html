@@ -303,7 +303,8 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
 .cline { font-family: var(--font-mono); background: var(--code-bg); border-radius: 4px; padding: 0 5px; }
 .cwarn { color: var(--danger); }
 .chip { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); }
-.citem.lost .cquote { text-decoration: line-through; text-decoration-color: var(--warn-fg); }
+.citem.lost .cquote, .cquote.cwas { text-decoration: line-through; text-decoration-color: var(--warn-fg); }
+.cquote.cwas { border-left-color: var(--border-strong); }
 .creply { font-size: 13px; line-height: 1.45; border-left: 3px solid var(--accent); padding-left: 8px; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ctext { font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .crow { display: flex; gap: 6px; }

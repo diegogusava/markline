@@ -8,74 +8,6 @@ const HL = !!(window.CSS && CSS.highlights && window.Highlight);
 let comments = [], activeId = null, pending = null, editingId = null, loadTok = 0, lastText = null, ranges = new Map();
 let hlTimer = null, listTimer = null, chain = Promise.resolve();
 
-/* ---------- text folding: drops markdown marks, collapses whitespace, keeps a map to original indexes ---------- */
-const DROP = /[*_`~|#>\\​]/;
-function fold(str, keep) {
-  let s = '', map = [], sp = true;
-  for (let i = 0; i < str.length; i++) {
-    if (keep && !keep[i]) continue;
-    const ch = str[i];
-    if (DROP.test(ch)) continue;
-    if (/\s/.test(ch) || (keep && keep[i] === 2)) { if (!sp) { s += ' '; map.push(i); sp = true; } continue; }
-    s += ch; map.push(i); sp = false;
-  }
-  if (s.endsWith(' ')) { s = s.slice(0, -1); map.pop(); }
-  return { s: s, map: map };
-}
-function mdKeep(md) {
-  const k = new Uint8Array(md.length).fill(1);
-  function zero(a, b) { for (let i = a; i < b; i++) k[i] = 0; }
-  let m;
-  const link = /!?\[([^\]\n]*)\]\(([^)\n]*)\)/g;
-  while ((m = link.exec(md))) {
-    const pre = m[0][0] === '!' ? 2 : 1;
-    zero(m.index, m.index + pre);
-    zero(m.index + pre + m[1].length, m.index + m[0].length);
-  }
-  const br = /<br\s*\/?>/gi;
-  while ((m = br.exec(md))) { k[m.index] = 2; zero(m.index + 1, m.index + m[0].length); }
-  [/^[ \t]*(?:[-+*]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gm, /^[ \t|:-]*-{3,}[ \t|:-]*$/gm, /^[ \t]*(?:```|~~~)[^\n]*$/gm].forEach(function (re) {
-    let x;
-    while ((x = re.exec(md))) { if (x[0].length) zero(x.index, x.index + x[0].length); else re.lastIndex++; }
-  });
-  return k;
-}
-function commonSuffix(a, b) { let n = 0; while (n < a.length && n < b.length && a[a.length - 1 - n] === b[b.length - 1 - n]) n++; return n; }
-function commonPrefix(a, b) { let n = 0; while (n < a.length && n < b.length && a[n] === b[n]) n++; return n; }
-/* find q in folded hay; the occurrence whose surroundings best match pre/suf wins */
-function locate(hay, q, pre, suf) {
-  if (!q) return null;
-  let best = null, bestScore = -1, i = hay.s.indexOf(q);
-  while (i !== -1) {
-    const sc = commonSuffix(hay.s.slice(Math.max(0, i - pre.length), i), pre) + commonPrefix(hay.s.slice(i + q.length, i + q.length + suf.length), suf);
-    if (sc > bestScore) { bestScore = sc; best = i; }
-    i = hay.s.indexOf(q, i + 1);
-  }
-  return best === null ? null : { a: best, b: best + q.length };
-}
-function ctx(raw, a, b) {
-  return { pre: fold(raw.slice(Math.max(0, a - 80), a)).s.slice(-30), suf: fold(raw.slice(b, b + 80)).s.slice(0, 30) };
-}
-
-/* ---------- markdown side (line numbers, source-view selection) ---------- */
-function mdIndex(md) {
-  const hay = fold(md, mdKeep(md));
-  function line(i) { let n = 1; for (let p = md.indexOf('\n'); p !== -1 && p < i; p = md.indexOf('\n', p + 1)) n++; return n; }
-  return {
-    find: function (c) {
-      const q = fold(c.quote).s;
-      let r = locate(hay, q, c.pre || '', c.suf || '');
-      if (!r && q.length > 40) {
-        const h = locate(hay, q.slice(0, 40), c.pre || '', ''), t = locate(hay, q.slice(-40), '', c.suf || '');
-        if (h && t && t.b >= h.a) r = { a: h.a, b: t.b };
-      }
-      if (!r) return null;
-      const s = hay.map[r.a], e = hay.map[r.b - 1] + 1;
-      return { s: s, e: e, l1: line(s), l2: line(e - 1) };
-    }
-  };
-}
-
 /* ---------- rendered side ---------- */
 function flatDoc() {
   const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
@@ -118,8 +50,7 @@ function docRanges() {
   if (mode !== 'rendered') return out;
   const flat = flatDoc(), hay = fold(flat.s);
   comments.forEach(function (c) {
-    if (c.status !== 'open' && c.status !== 'sent') return;
-    const r = locate(hay, fold(c.quote).s, c.pre || '', c.suf || '');
+    const r = locate(hay, qfold(c.quote), c.pre || '', c.suf || '');
     if (!r) return;
     const a = flatToPoint(flat, hay.map[r.a], false), b = flatToPoint(flat, hay.map[r.b - 1] + 1, true);
     if (!a || !b) return;
@@ -133,7 +64,8 @@ function refreshHighlights() {
   if (!HL) return;
   CSS.highlights.delete('ml-c'); CSS.highlights.delete('ml-ca');
   const all = [], act = [];
-  ranges.forEach(function (r, id) { (id === activeId ? act : all).push(r); });
+  const live = new Set(comments.filter(function (c) { return c.status === 'open' || c.status === 'sent'; }).map(function (c) { return c.id; }));
+  ranges.forEach(function (r, id) { if (id === activeId) act.push(r); else if (live.has(id)) all.push(r); });
   if (all.length) CSS.highlights.set('ml-c', new Highlight(...all));
   if (act.length) CSS.highlights.set('ml-ca', new Highlight(...act));
 }
@@ -279,8 +211,8 @@ function item(c, loc) {
   else if (lost) meta.appendChild(el('span', 'chip', 'Text changed'));
   if (c.status !== 'open') meta.appendChild(el('span', '', c.status));
   it.appendChild(meta);
-  const q = el('div', 'cquote', c.quote);
-  it.appendChild(q);
+  if (c.was) it.appendChild(el('div', 'cquote cwas', c.was));
+  it.appendChild(el('div', 'cquote', c.quote));
   if (editingId === c.id) {
     const ta = el('textarea'); ta.rows = 3; ta.value = c.comment;
     it.appendChild(ta);
@@ -345,7 +277,7 @@ function payload() {
     note: 'Review comments from Markline. Apply every comment with status "open" to the markdown file, then set its status to "applied". startLine/endLine are 1-based lines of the quoted text in the saved file.',
     comments: comments.map(function (c) {
       const loc = idx.find(c);
-      return { id: c.id, status: c.status, startLine: loc ? loc.l1 : null, endLine: loc ? loc.l2 : null, quote: c.quote, comment: c.comment, pre: c.pre, suf: c.suf, created: c.created, batchId: c.batchId, reply: c.reply };
+      return { id: c.id, status: c.status, startLine: loc ? loc.l1 : null, endLine: loc ? loc.l2 : null, quote: c.quote, was: c.was, comment: c.comment, pre: c.pre, suf: c.suf, created: c.created, batchId: c.batchId, reply: c.reply };
     })
   };
 }
@@ -353,7 +285,7 @@ function parse(text) {
   if (!text) return [];
   const d = JSON.parse(text);
   return (d.comments || []).filter(function (c) { return c && c.quote; }).map(function (c, i) {
-    return { id: String(c.id || 'c' + i + Date.now().toString(36)), status: ['open', 'sent', 'applied', 'resolved'].indexOf(c.status) >= 0 ? c.status : 'open', batchId: c.batchId, reply: c.reply ? String(c.reply) : '', quote: String(c.quote), pre: c.pre || '', suf: c.suf || '', comment: String(c.comment != null ? c.comment : c.text || ''), created: c.created || '' };
+    return { id: String(c.id || 'c' + i + Date.now().toString(36)), status: ['open', 'sent', 'applied', 'resolved'].indexOf(c.status) >= 0 ? c.status : 'open', batchId: c.batchId, reply: c.reply ? String(c.reply) : '', quote: String(c.quote), was: c.was ? String(c.was) : undefined, pre: c.pre || '', suf: c.suf || '', comment: String(c.comment != null ? c.comment : c.text || ''), created: c.created || '' };
   });
 }
 async function readStore() {
