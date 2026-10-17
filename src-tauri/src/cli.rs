@@ -2,7 +2,7 @@
 //   markline serve [--root DIR] [--port N] [--lan] [--token T]   headless web server (runs until `stop`)
 //   markline open FILE.md [--lan] [--port N] [--no-open]          start a server if none runs, print the link
 //   markline poll [--file F] [--timeout SECS] [--json]            wait for comments sent from the browser
-//   markline reply [--batch ID] [--resolved] "what you changed"   answer them in the browser
+//   markline reply [--batch ID] [--comment ID --lines A-B] [--resolved] "what you changed"   answer them in the browser
 //   markline status | stop
 use crate::web::{self, Web};
 use serde_json::{json, Value};
@@ -64,7 +64,7 @@ const USAGE: &str = "Usage: markline [FILE.md | DIR]      open the desktop app (
        markline serve [--root DIR] [--port N] [--lan] [--token T]
        markline open FILE.md [--lan] [--port N] [--no-open]
        markline poll [--file F] [--timeout SECS] [--json]
-       markline reply [--batch ID] [--resolved] \"what you changed\"
+       markline reply [--batch ID] [--comment ID --lines A-B] [--resolved] \"what you changed\"
        markline status | stop";
 
 pub fn run(argv: Vec<String>) -> Option<i32> {
@@ -176,11 +176,13 @@ fn poll(a: &Args) -> i32 {
     for (i, c) in batch["comments"].as_array().cloned().unwrap_or_default().iter().enumerate() {
         let (l1, l2) = (c["startLine"].as_u64(), c["endLine"].as_u64());
         let loc = match (l1, l2) { (Some(x), Some(y)) if x == y => format!("Line {}", x), (Some(x), Some(y)) => format!("Lines {}-{}", x, y), _ => "Location unknown".into() };
-        println!("{}. {}, passage:", i + 1, loc);
+        println!("{}. [{}] {}, passage:", i + 1, c["id"].as_str().unwrap_or(""), loc);
         println!("   > {}", c["quote"].as_str().unwrap_or("").replace('\n', "\n   > "));
         println!("   Comment: {}\n", c["comment"].as_str().unwrap_or("").replace('\n', "\n   "));
     }
-    println!("When finished, run: {} reply --batch {} \"<one or two sentences on what you changed>\"", me(), id);
+    println!("When finished, reply once per comment with the lines that now hold the edited passage (1-based, in the saved file):");
+    println!("  {} reply --batch {} --comment <ID> --lines <A-B> \"<what you changed>\"", me(), id);
+    println!("For a comment you answered without editing, leave out --lines. To answer all at once: {} reply --batch {} \"<summary>\"", me(), id);
     println!("Then run `{} poll` again to wait for the next round.", me());
     0
 }
@@ -189,9 +191,9 @@ fn reply(a: &Args) -> i32 {
     let s = match need_server() { Ok(s) => s, Err(c) => return c };
     let text = a.pos.join(" ");
     let resolved = a.flags.contains_key("resolved");
-    if text.is_empty() && !resolved { return err("Usage: markline reply [--batch ID] [--file F] [--resolved] \"what you changed\""); }
+    if text.is_empty() && !resolved { return err("Usage: markline reply [--batch ID] [--file F] [--comment ID --lines A-B] [--resolved] \"what you changed\""); }
     let file = a.flags.get("file").and_then(|f| Path::new(f).canonicalize().ok()).map(|p| p.to_string_lossy().into_owned());
-    let body = json!({"batch": a.flags.get("batch"), "file": file, "text": text, "status": if resolved { "resolved" } else { "applied" }});
+    let body = json!({"batch": a.flags.get("batch"), "file": file, "comment": a.flags.get("comment"), "lines": a.flags.get("lines"), "text": text, "status": if resolved { "resolved" } else { "applied" }});
     match http(&s, "POST", "/api/reply", Some(&body), Duration::from_secs(10)) {
         Ok(v) => { println!("Replied; {} comment(s) marked {}.", v["result"]["updated"], if resolved { "resolved" } else { "applied" }); 0 }
         Err(e) => err(&format!("Reply failed: {}", e)),

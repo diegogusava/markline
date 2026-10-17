@@ -170,6 +170,19 @@ fn write_sidecar(f: &Path, d: &Value) -> Result<(), E> {
 fn comments_mut(d: &mut Value) -> &mut Vec<Value> { d["comments"].as_array_mut().expect("comments array") }
 fn s<'a>(v: &'a Value, k: &str) -> &'a str { v.get(k).and_then(|x| x.as_str()).unwrap_or("") }
 
+/// text of 1-based lines "A-B" (or "A") of a file
+fn lines_of(f: &Path, spec: &str) -> Result<String, E> {
+    let bad = || E(400, format!("Bad lines: {} (use A-B, 1-based)", spec));
+    let (a, b) = spec.split_once('-').unwrap_or((spec, spec));
+    let (a, b): (usize, usize) = (a.trim().parse().map_err(|_| bad())?, b.trim().parse().map_err(|_| bad())?);
+    let text = std::fs::read_to_string(f).map_err(|e| E(500, e.to_string()))?;
+    let all: Vec<&str> = text.lines().collect();
+    if a == 0 || b < a || b > all.len() { return Err(bad()); }
+    let q = all[a - 1..b].join("\n").trim().to_string();
+    if q.is_empty() { return Err(bad()); }
+    Ok(q)
+}
+
 /// keep only the comments of this batch that are still waiting for the agent
 fn live_batch(b: &mut Batch) -> bool {
     let mut d = read_sidecar(&b.file);
@@ -267,14 +280,20 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
             };
             let status = if path("status") == "resolved" { "resolved" } else { "applied" };
             let text = path("text");
+            let (only, lines) = (path("comment"), path("lines"));
+            if !lines.is_empty() && only.is_empty() { return fail(400, "lines needs comment"); }
+            // the agent says which lines now hold the edited passage: that text becomes the comment's anchor
+            let quote = if lines.is_empty() { None } else { Some(lines_of(&f, &lines)?) };
             let mut d = read_sidecar(&f);
             let mut n = 0;
             for c in comments_mut(&mut d).iter_mut() {
-                if s(c, "status") != "sent" || (!batch.is_empty() && s(c, "batchId") != batch) { continue; }
+                if s(c, "status") != "sent" || (!batch.is_empty() && s(c, "batchId") != batch) || (!only.is_empty() && s(c, "id") != only) { continue; }
                 c["status"] = json!(status);
                 if !text.is_empty() { c["reply"] = json!(text); }
+                if let Some(q) = &quote { c["was"] = c["quote"].clone(); c["quote"] = json!(q); }
                 n += 1;
             }
+            if n == 0 && !only.is_empty() { return fail(404, &format!("No comment {} is waiting for a reply", only)); }
             write_sidecar(&f, &d)?;
             Ok(json!({"updated": n}))
         }
@@ -450,5 +469,39 @@ impl Web {
         write_state(&info);
         *self.inner.lock().unwrap() = Some(Running { server, state, info: info.clone() });
         Ok(info)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state(root: PathBuf) -> State {
+        State {
+            root, token: String::new(), stopped: AtomicBool::new(false), allow_exit: false, pollers: AtomicUsize::new(0),
+            qs: Mutex::new(Queue { queue: VecDeque::new(), batches: HashMap::new() }), cv: Condvar::new(),
+        }
+    }
+
+    #[test]
+    fn reply_with_lines_anchors_the_comment_to_the_edited_text() {
+        let dir = std::env::temp_dir().join(format!("markline-reply-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let doc = dir.join("doc.md");
+        std::fs::write(&doc, "# Plan\n\n- The payments team owns retries.\n- Coupons stay.\n").unwrap();
+        std::fs::write(dir.join("doc.md.comments.json"), json!({"version": 1, "file": "doc.md", "comments": [
+            {"id": "c1", "status": "sent", "batchId": "b1", "quote": "Who owns the retry code?", "comment": "Name the team"},
+            {"id": "c2", "status": "sent", "batchId": "b1", "quote": "Coupons stay.", "comment": "Why?"}
+        ]}).to_string()).unwrap();
+        let st = state(dir.canonicalize().unwrap());
+
+        api(&st, "reply", &json!({"file": doc.to_string_lossy(), "batch": "b1", "comment": "c1", "lines": "3-3", "text": "Named the team"})).unwrap_or_else(|E(_, m)| panic!("{}", m));
+
+        let d = read_sidecar(&doc);
+        let c = &d["comments"];
+        assert_eq!(
+            (s(&c[0], "status"), s(&c[0], "quote"), s(&c[0], "was"), s(&c[1], "status")),
+            ("applied", "- The payments team owns retries.", "Who owns the retry code?", "sent")
+        );
     }
 }
