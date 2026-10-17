@@ -1,14 +1,26 @@
 # Markline
 
-A desktop Markdown editor built with Tauri. It renders as you type, edits Mermaid diagrams visually, and lets you review a document with comments that a coding agent can read and answer. The same editor runs in a phone browser through a built-in web server.
+A Markdown editor for people who review documents with a coding agent. You write in a rendered page, draw diagrams with the mouse, and leave comments on passages. A coding agent such as Claude Code or Codex picks the comments up, edits the file and replies in place. Copilot works through a prompt file. The desktop app (Tauri, Linux and Windows) also serves the same editor to your phone's browser.
 
-## Features
+![Markline with the file panel, a document with a flowchart and the review comments](docs/screenshots/overview.png)
 
-- Rendered and Source views, with a folder panel for browsing notes.
-- Review comments anchored to quoted text, stored next to the file as `NAME.md.comments.json`.
-- Built-in web server (**Share**) so a phone or another computer gets the same editor.
-- Command line mode for agents (Claude Code, Codex, Grok): `poll` for comments, `reply` after editing.
-- Runs offline. No Node server at runtime.
+## What it does
+
+- **Write in the rendered view.** Headings, lists, tables, code and front matter are edited in place, and saved as plain Markdown. Switch to **Source** at any time.
+- **Edit Mermaid diagrams visually.** Flowcharts, architecture diagrams with groups, ER schemas and class diagrams. Click a node to rename it, change its shape or connect it. **Code** shows the Mermaid text.
+- **Review with an agent.** Select text, add a comment, press **Send to agent**. The agent runs `markline poll`, edits the file and runs `markline reply`. Each reply shows under its comment, and clicking the comment jumps to the changed text.
+- **Keep comments on track.** Comments are anchored to the quoted text, not to line numbers. If you rewrite the passage, the comment shows **Text changed** and points to the closest match.
+- **Use it from your phone.** **Share** starts a small web server for one folder, protected by a token.
+- **Work offline.** One binary, no Node server at runtime, light and dark themes.
+
+![Selecting a flowchart node opens the inspector with label and shape](docs/screenshots/diagram.png)
+
+![Comments panel: an open comment, one whose text changed, one waiting for the agent and one applied with the agent's reply](docs/screenshots/review.png)
+
+<p>
+  <img src="docs/screenshots/source-dark.png" alt="Source view with line numbers in the dark theme" width="72%">
+  <img src="docs/screenshots/phone.png" alt="The editor on a phone" width="24%">
+</p>
 
 ## Install
 
@@ -52,14 +64,16 @@ sudo install -m755 src-tauri/target/release/markline /usr/local/bin/
 
 | Action | How |
 |--------|-----|
-| Show or hide the side panel | **Files** or **Outline** tab on the left edge, or `Ctrl+\` |
-| Jump to a heading | **Outline** tab, then click the heading |
-| Open a folder | **Open...** (the last folder is remembered) |
-| Text size | **A-** / **A+**, `Ctrl` + `-` / `=` / `0`, or `Ctrl` + wheel |
-| Page width | arrows next to the size buttons (Narrow to Full) |
+| Show or hide the side panel | folder or outline icon on the left edge, or `Ctrl+\` |
+| Jump to a heading | outline icon, then click the heading |
+| Open a folder | **Open...** in the side panel (the last folder is remembered) |
+| Insert a diagram | **Diagram** menu in the format bar |
+| Text size | `Ctrl` + `-` / `=` / `0`, `Ctrl` + wheel, or **Settings** |
+| Theme, fonts, line numbers, page width | **Settings** (gear icon, `Ctrl+,`) |
+| Undo, redo, history | arrow icons and the clock icon, or `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Comment on a passage | select text, then `Ctrl+Alt+M` or click the Comment bubble |
 
-Comments are highlighted in Rendered view and listed in the side panel with line numbers. They are anchored to the quoted text, so they survive edits.
+Comments are highlighted in Rendered view and listed in the side panel with line numbers. They are anchored to the quoted text, so they survive edits elsewhere. When the quoted text itself was rewritten, the comment shows **Text changed** and a line like `~L35`: clicking it selects the closest match, found from the text that stood around the quote.
 
 ### Review with Copilot
 
@@ -69,7 +83,7 @@ Comments are highlighted in Rendered view and listed in the side panel with line
 ## Use it from your phone
 
 1. Open the app, then **Files > Open...** and pick your notes folder.
-2. Click **Share**, keep **Allow other devices** ticked, press **Start sharing**.
+2. Click **Share** (phone icon), keep **Allow other devices** ticked, press **Start sharing**.
 3. Open the link under **On your phone** in your phone's browser (same Wi-Fi, or Tailscale away from home).
 
 Tick **Start sharing when the app starts** to keep it on. The link stays the same between restarts.
@@ -90,20 +104,21 @@ markline serve --root ~/notes --lan   # headless server, runs in the foreground
 markline open notes/plan.md       # start a headless server if none runs, print the link
 markline open notes/plan.md --lan # same, reachable from your phone
 markline poll                     # block until "Send to agent" is pressed; print the comments
-markline reply --batch ID "what I changed"
+markline reply --batch ID --comment C2 --lines 14-16 "what I changed"
+markline reply --batch ID "summary for every comment of the batch"
 markline status
 markline stop
 ```
 
-Flags: `--root DIR`, `--port N` (default 8080), `--lan`, `--token T`, `--no-open`, `--file F`, `--timeout SECS`, `--json`, `--resolved`.
+Flags: `--root DIR`, `--port N` (default 8080), `--lan`, `--token T`, `--no-open`, `--file F`, `--timeout SECS`, `--json`, `--resolved`, `--comment ID`, `--lines A-B`.
 
 `open` and `poll` find the running server by themselves, whether it is the app's Share server or a headless one.
 
 ### Agent review loop
 
 1. In the browser or the desktop app, select text, add comments, then press **Send to agent** in the Comments panel.
-2. The agent runs `poll`, edits the file in place, then runs `reply --batch ID "..."`.
-3. The page reloads about 2 seconds after the save (unless you have unsaved edits) and shows the reply under each comment: *Waiting for the agent*, then *Applied*.
+2. The agent runs `poll`, which prints each comment with its ID. It edits the file in place, then replies once per comment: `reply --batch ID --comment C2 --lines 14-16 "..."`. `--lines` are the lines that now hold the edited passage. Markline re-anchors the comment to that text and keeps the old quote, struck through, above it.
+3. The page reloads about 2 seconds after the save (unless you have unsaved edits) and shows the reply under each comment: *Waiting for the agent*, then *Applied*. Click an applied comment to jump to the change.
 
 On a touch screen, a Comment bubble appears when you select text.
 
