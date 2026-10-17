@@ -9,14 +9,14 @@ let comments = [], activeId = null, pending = null, editingId = null, loadTok = 
 let hlTimer = null, listTimer = null, chain = Promise.resolve();
 
 /* ---------- text folding: drops markdown marks, collapses whitespace, keeps a map to original indexes ---------- */
-const DROP = /[*_`~|#>​]/;
+const DROP = /[*_`~|#>\\​]/;
 function fold(str, keep) {
   let s = '', map = [], sp = true;
   for (let i = 0; i < str.length; i++) {
     if (keep && !keep[i]) continue;
     const ch = str[i];
     if (DROP.test(ch)) continue;
-    if (/\s/.test(ch)) { if (!sp) { s += ' '; map.push(i); sp = true; } continue; }
+    if (/\s/.test(ch) || (keep && keep[i] === 2)) { if (!sp) { s += ' '; map.push(i); sp = true; } continue; }
     s += ch; map.push(i); sp = false;
   }
   if (s.endsWith(' ')) { s = s.slice(0, -1); map.pop(); }
@@ -32,6 +32,8 @@ function mdKeep(md) {
     zero(m.index, m.index + pre);
     zero(m.index + pre + m[1].length, m.index + m[0].length);
   }
+  const br = /<br\s*\/?>/gi;
+  while ((m = br.exec(md))) { k[m.index] = 2; zero(m.index + 1, m.index + m[0].length); }
   [/^[ \t]*(?:[-+*]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/gm, /^[ \t|:-]*-{3,}[ \t|:-]*$/gm, /^[ \t]*(?:```|~~~)[^\n]*$/gm].forEach(function (re) {
     let x;
     while ((x = re.exec(md))) { if (x[0].length) zero(x.index, x.index + x[0].length); else re.lastIndex++; }
@@ -76,14 +78,15 @@ function mdIndex(md) {
 
 /* ---------- rendered side ---------- */
 function flatDoc() {
-  const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
-  let s = '', segs = [], prev = null, n;
+  const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  let s = '', segs = [], prev = null, br = false, n;
   while ((n = w.nextNode())) {
+    if (n.nodeType === 1) { if (n.nodeName === 'BR') br = true; continue; }
     const pe = n.parentElement;
     if (!n.nodeValue || !pe || pe.closest('figure.mm, figure.fm')) continue;
     const blk = pe.closest('p,li,h1,h2,h3,h4,h5,h6,pre,td,th,blockquote,div');
-    if (prev && blk !== prev) s += ' ';
-    prev = blk;
+    if ((prev && blk !== prev) || (br && s)) s += ' ';
+    prev = blk; br = false;
     segs.push({ node: n, start: s.length, len: n.nodeValue.length });
     s += n.nodeValue;
   }
@@ -269,7 +272,7 @@ function item(c, loc) {
   it.dataset.id = c.id;
   const meta = el('div', 'cmeta');
   if (loc) meta.appendChild(el('span', 'cline', loc.l1 === loc.l2 ? 'L' + loc.l1 : 'L' + loc.l1 + '-' + loc.l2));
-  else if (c.status === 'open' || c.status === 'sent') meta.appendChild(el('span', 'cwarn', 'text not found any more'));
+  else if ((c.status === 'open' || c.status === 'sent') && !ranges.has(c.id)) meta.appendChild(el('span', 'cwarn', 'text not found any more'));
   if (c.status !== 'open') meta.appendChild(el('span', '', c.status));
   it.appendChild(meta);
   const q = el('div', 'cquote', c.quote);

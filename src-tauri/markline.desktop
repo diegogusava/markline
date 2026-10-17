@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Markline
+Comment=Markdown editor with review comments for coding agents
+Exec=markline %f
+Icon=markline
+Type=Application
+Terminal=false
+Categories=Office;TextEditor;Development;
+MimeType=text/markdown;text/x-markdown;inode/directory;

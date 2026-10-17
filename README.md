@@ -34,6 +34,8 @@ node build-app.js              # assembles dist/ from editor/src
 npx tauri build --no-bundle    # binary: src-tauri/target/release/markline
 ```
 
+Run the Markdown conversion regression tests with `node --test`.
+
 On Arch, `makepkg -si` uses the included `PKGBUILD`:
 
 ```sh

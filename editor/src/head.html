@@ -201,11 +201,12 @@ figure.mm.sel .mm-insp { display: flex; }
 #srcnumin { font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); padding: 20px 0 140px 3.6em; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
 #srcnumin div { position: relative; color: transparent; }
 #srcnumin div::before { content: attr(data-n); position: absolute; left: -3.6em; width: 3em; text-align: right; color: var(--muted); }
-.bar, #rail, #side, #cpanel, .status, #sharebox, #settings { zoom: var(--uizoom, 1); }
+.bar, #rail, #side, #cpanel, .status, #sharebox, #settings, #histbox { zoom: var(--uizoom, 1); }
 .body { flex: 1; min-height: 0; display: flex; }
 #scroll { flex: 1; min-width: 0; }
 #side { width: 270px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); min-height: 0; }
 .side-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
+#sideClose { min-width: 44px; min-height: 44px; }
 .side-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #rail { width: 30px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); }
 #rail[hidden] { display: none; }
@@ -267,7 +268,7 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 #diffBody .add { background: rgba(46,160,67,.2); }
 #diffBody .del { background: rgba(248,81,73,.2); }
 #diffBody .gap { color: var(--muted); font-style: italic; }
-#sharebox, #settings, #diffbox { position: fixed; top: 52px; right: 12px; z-index: 30; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 70px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.28); overflow: hidden; }
+#sharebox, #settings, #diffbox, #histbox { position: fixed; top: 52px; right: 12px; z-index: 30; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 70px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.28); overflow: hidden; }
 #diffbox { top: auto; bottom: 40px; max-height: 40vh; }
 #diffNav { display: inline-flex; gap: 4px; margin-left: auto; }
 #diffNav[hidden] { display: none; }
@@ -277,7 +278,19 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 #doc .chg-gone::before { top: -2px; }
 #doc .chg-end::after { bottom: -2px; }
 #doc .chg-cur { background: rgba(255,200,0,.14); }
-#sharebox[hidden], #settings[hidden] { display: none; }
+#sharebox[hidden], #settings[hidden], #histbox[hidden] { display: none; }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn:disabled:hover { background: var(--surface); }
+#bUndo, #bRedo { padding-inline: 9px; font-size: 15px; line-height: 1.05; }
+#histList { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
+.hitem { padding: 6px 9px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+.hitem:hover, .hitem:focus-visible { background: var(--accent-soft); outline: none; }
+.hitem.cur { border-color: var(--accent); background: var(--accent-soft); cursor: default; }
+.hitem.undone { opacity: .55; }
+.hmeta { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.htag { margin-left: auto; font-weight: 600; color: var(--accent); }
+.htext { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.hnote { text-transform: none; letter-spacing: 0; padding: 8px 12px 10px; border-top: 1px solid var(--border); line-height: 1.45; }
 .shrow select { font: inherit; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--fg); }
 .shrow input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
 .shrow .rl { width: 110px; flex: none; }
@@ -291,6 +304,10 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
     <div class="wrap row1">
       <div class="file"><span id="fname">sample.md</span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
       <div class="grow"></div>
+      <button class="btn" id="bUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>&#8630;</button>
+      <button class="btn" id="bRedo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>&#8631;</button>
+      <button class="btn" id="bHist" type="button" title="Every change since you opened this file; click one to bring it back" aria-pressed="false">History</button>
+      <span class="sep"></span>
       <button class="btn" id="bNew" type="button">New</button>
       <button class="btn" id="bOpen" type="button">Open</button>
       <button class="btn primary" id="bSave" type="button" title="Save (Ctrl+S)">Save</button>
@@ -338,6 +355,7 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
         <span id="sideName" class="side-name" title="">Folder</span>
         <button type="button" class="btn sm" id="sideOpen" title="Open a folder">Open&hellip;</button>
         <button type="button" class="btn sm" id="sideRefresh" title="Reload the folder" aria-label="Reload">&#8635;</button>
+        <button type="button" class="btn sm" id="sideClose" title="Hide panel" aria-label="Hide sidebar">&times;</button>
       </div>
       <div id="tree" class="tree" role="tree"></div>
       <div id="outline" class="tree" hidden></div>
@@ -401,6 +419,11 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
     <label class="shrow" id="shAutoRow"><input type="checkbox" id="shAuto"> Start sharing when the app starts</label>
     <div class="cnote" style="text-transform:none;letter-spacing:0">Open the link on your phone. Anyone with the link can read and edit the shared folder, and the connection is not encrypted, so only use it on a network you trust or over Tailscale. Sharing stops when you close the app.</div>
   </div>
+</div>
+<div id="histbox" hidden role="dialog" aria-label="History">
+  <div class="side-head"><span class="side-name">History <span id="histCount" class="cbadge"></span></span><button type="button" class="btn sm" id="histClose" aria-label="Close">&times;</button></div>
+  <ul id="histList"></ul>
+  <div class="cnote hnote">Click a version to bring it back. Restoring adds a new entry, so newer versions stay in the list. Each file keeps its last 500 versions until you close the app.</div>
 </div>
 <div id="settings" hidden role="dialog" aria-label="Settings">
   <div class="side-head"><span class="side-name">Settings</span><button type="button" class="btn sm" id="setClose" aria-label="Close">&times;</button></div>

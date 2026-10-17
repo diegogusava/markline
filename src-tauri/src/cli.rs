@@ -60,7 +60,7 @@ fn need_server() -> Result<Srv, i32> {
 }
 fn me() -> String { std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_else(|_| "markline".into()) }
 
-const USAGE: &str = "Usage: markline [FILE.md]            open the desktop app
+const USAGE: &str = "Usage: markline [FILE.md | DIR]      open the desktop app (a folder opens in the sidebar)
        markline serve [--root DIR] [--port N] [--lan] [--token T]
        markline open FILE.md [--lan] [--port N] [--no-open]
        markline poll [--file F] [--timeout SECS] [--json]

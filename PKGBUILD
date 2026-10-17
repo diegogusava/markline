@@ -21,13 +21,5 @@ package() {
   cd "$startdir"
   install -Dm755 src-tauri/target/release/markline "$pkgdir/usr/bin/markline"
   install -Dm644 src-tauri/icons/icon.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/markline.png"
-  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/markline.desktop" <<DESK
-[Desktop Entry]
-Name=Markline
-Exec=markline %f
-Icon=markline
-Type=Application
-Categories=Office;TextEditor;Development;
-MimeType=text/markdown;text/x-markdown;
-DESK
+  install -Dm644 src-tauri/markline.desktop "$pkgdir/usr/share/applications/markline.desktop"
 }

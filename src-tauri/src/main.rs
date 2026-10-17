@@ -119,10 +119,24 @@ fn open_url(url: String) -> Result<(), String> {
     cmd.arg(&url).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
+fn initial_arg() -> Option<std::path::PathBuf> {
+    let arg = std::env::args().skip(1).find(|a| !a.starts_with('-'))?;
+    let p = Path::new(&arg);
+    Some(p.canonicalize().unwrap_or_else(|_| p.to_path_buf()))
+}
+
 #[tauri::command]
 fn initial_file() -> Option<Opened> {
-    let arg = std::env::args().skip(1).find(|a| !a.starts_with('-'))?;
-    read(Path::new(&arg)).ok()
+    let p = initial_arg()?;
+    if p.is_dir() { return None; }
+    read(&p).ok()
+}
+
+/// `markline DIR` (also what the file manager's "Open With Markline" runs on a folder) opens that folder in the sidebar
+#[tauri::command]
+fn initial_folder() -> Option<String> {
+    let p = initial_arg()?;
+    if p.is_dir() { Some(p.to_string_lossy().into_owned()) } else { None }
 }
 
 fn main() {
@@ -131,7 +145,7 @@ fn main() {
     tauri::Builder::default()
         .manage(web::Web::default())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, pick_folder, list_dir, read_file, read_optional, stat, web_start, web_stop, web_status, open_url])
+        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, stat, web_start, web_stop, web_status, open_url])
         .run(tauri::generate_context!())
         .expect("error while running Markline");
 }
