@@ -1,3 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Markline</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -54,7 +57,7 @@
   --danger: #f2877f;
   color-scheme: dark;
 }
-html, body { height: 100%; }
+html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; }
 * { box-sizing: border-box; }
 #app { display: flex; flex-direction: column; height: 100%; }
@@ -206,7 +209,8 @@ figure.mm.sel .mm-insp { display: flex; }
 .side-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #rail { width: 30px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); }
 #rail[hidden] { display: none; }
-.rtab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 14px 0; font: inherit; font-size: 12px; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.rtab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 14px 0; font: inherit; font-size: 12px; background: none; border: 0; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.rtab > span { writing-mode: vertical-rl; }
 .rtab:hover { color: var(--fg); }
 .rtab.on { color: var(--accent); background: var(--accent-soft); box-shadow: inset -2px 0 0 var(--accent); }
 .tree[hidden] { display: none; }
@@ -326,8 +330,8 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
   </header>
   <div class="body">
     <nav id="rail" hidden aria-label="Panels">
-      <button type="button" class="rtab" id="tabFiles" title="Files (Ctrl+\)" aria-pressed="false">Files</button>
-      <button type="button" class="rtab" id="tabOutline" title="Outline" aria-pressed="false">Outline</button>
+      <button type="button" class="rtab" id="tabFiles" title="Files (Ctrl+\)" aria-pressed="false"><span>Files</span></button>
+      <button type="button" class="rtab" id="tabOutline" title="Outline" aria-pressed="false"><span>Outline</span></button>
     </nav>
     <aside id="side" hidden aria-label="Sidebar">
       <div class="side-head">
