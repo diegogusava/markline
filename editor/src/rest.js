@@ -124,7 +124,7 @@ function toast(t) {
 function updateCount() {
   const t = mode === 'source' ? srcEl.value : doc.innerText;
   const n = (t.trim().match(/\S+/g) || []).length;
-  $('#wc').textContent = n + (n === 1 ? ' word' : ' words');
+  $('#wc').textContent = n + (n === 1 ? ' word' : ' words') + ' \u00b7 ' + Math.max(1, Math.round(n / 220)) + ' min read';
 }
 /* undo/redo: snapshots of the markdown, taken after a pause in typing. Native undo breaks when the DOM is rebuilt (highlights, diagrams).
    Each file keeps its own list for the session, so switching files and coming back keeps the history. */
@@ -750,7 +750,7 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
       row.dataset.path = it.path;
       row.setAttribute('role', 'treeitem');
       row.title = it.path;
-      row.innerHTML = '<span class="ic">' + (it.is_dir ? (open.has(it.path) ? '&#9662;' : '&#9656;') : '') + '</span><span class="nm"></span>';
+      row.innerHTML = '<span class="tic">' + (it.is_dir ? (open.has(it.path) ? '&#9662;' : '&#9656;') : '<svg class="ic" width="14" height="14"><use href="#i-file"/></svg>') + '</span><span class="nm"></span>';
       row.querySelector('.nm').textContent = it.name;
       li.appendChild(row);
       if (it.is_dir) {
@@ -758,8 +758,8 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
         li.appendChild(sub);
         if (open.has(it.path)) fill(sub, it.path).then(syncActive);
         row.addEventListener('click', function () {
-          if (open.has(it.path)) { open.delete(it.path); sub.innerHTML = ''; row.querySelector('.ic').innerHTML = '&#9656;'; }
-          else { open.add(it.path); row.querySelector('.ic').innerHTML = '&#9662;'; fill(sub, it.path).then(syncActive); }
+          if (open.has(it.path)) { open.delete(it.path); sub.innerHTML = ''; row.querySelector('.tic').innerHTML = '&#9656;'; }
+          else { open.add(it.path); row.querySelector('.tic').innerHTML = '&#9662;'; fill(sub, it.path).then(syncActive); }
         });
       } else {
         row.addEventListener('click', function () {
@@ -1104,11 +1104,14 @@ function updateToolState() {
 }
 document.addEventListener('selectionchange', updateToolState);
 doc.addEventListener('input', updateToolState);
-$('#tools').addEventListener('mousedown', function (e) { if (e.target.closest('button')) e.preventDefault(); });
+$('#tools').addEventListener('mousedown', function (e) { if (e.target.closest('button, summary')) e.preventDefault(); });
 $('#tools').addEventListener('click', function (e) {
   const b = e.target.closest('[data-tool]');
-  if (b) runTool(b.dataset.tool);
+  if (!b) return;
+  $('#dmenu').open = false;
+  runTool(b.dataset.tool);
 });
+document.addEventListener('click', function (e) { if (!e.target.closest('#dmenu')) $('#dmenu').open = false; });
 
 /* markdown shortcuts while typing */
 function spaceShortcut() {

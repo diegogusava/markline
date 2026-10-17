@@ -20,7 +20,7 @@ function render() {
   $('#shGo').textContent = info.running ? 'Stop sharing' : 'Start sharing';
   $('#shGo').classList.toggle('primary', !info.running);
   btn.classList.toggle('on', !!info.running);
-  btn.textContent = info.running ? 'Sharing' : 'Share';
+  btn.title = info.running ? 'Sharing is on. Click to see the link or stop it' : 'Share: use this app from your phone or another computer';
   $('#shPort').disabled = $('#shLan').disabled = !!info.running;
   const u = $('#shUrls'); u.textContent = '';
   (info.running ? info.urls : []).forEach(function (url, i) {

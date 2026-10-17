@@ -4,57 +4,72 @@
 <title>Markline</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: full-height app. Sticky toolbar on top, one centered 760px document column, status line at the bottom.
+/* Layout: full-height app. Toolbar on top, the document as a centered page, status line at the bottom.
    Diagram blocks are islands inside the document: canvas on top, inspector strip underneath when selected. */
 :root {
-  --bg: #f4f6f7;
+  --bg: #eef1f3;
   --surface: #ffffff;
-  --canvas: #fafbfc;
-  --fg: #1a2730;
-  --muted: #586973;
-  --border: #d9e1e6;
-  --border-strong: #b9c7d0;
-  --accent: #0b7a85;
+  --canvas: #f8fafb;
+  --page: #ffffff;
+  --fg: #17242c;
+  --muted: #5f707a;
+  --border: #e1e7eb;
+  --border-strong: #c9d3d9;
+  --accent: #0a7480;
   --accent-fg: #ffffff;
-  --accent-soft: #d9eff1;
-  --code-bg: #edf1f3;
+  --accent-soft: #e0f1f3;
+  --code-bg: #f1f4f6;
+  --hover: #eef2f4;
   --edge: #66777f;
   --danger: #b3261e;
+  --warn-bg: #fde8d4;
+  --warn-fg: #9a4a00;
+  --shadow: 0 1px 2px rgba(16,32,40,.06), 0 8px 24px rgba(16,32,40,.06);
   --font-ui: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1519;
-    --surface: #161e24;
-    --canvas: #121a1f;
-    --fg: #e2e9ed;
-    --muted: #93a4ae;
-    --border: #263540;
-    --border-strong: #3a4c58;
-    --accent: #45b7c3;
+    --bg: #0c1114;
+    --surface: #12191e;
+    --canvas: #10171b;
+    --page: #141c21;
+    --fg: #e3eaee;
+    --muted: #8fa1ab;
+    --border: #1f2b33;
+    --border-strong: #31424d;
+    --accent: #4fc1cc;
     --accent-fg: #08181b;
-    --accent-soft: #16363b;
-    --code-bg: #1d2830;
+    --accent-soft: #143238;
+    --code-bg: #18222a;
+    --hover: #1a242b;
     --edge: #8a9ba5;
     --danger: #f2877f;
+    --warn-bg: #3d2412;
+    --warn-fg: #f5a25d;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1519;
-  --surface: #161e24;
-  --canvas: #121a1f;
-  --fg: #e2e9ed;
-  --muted: #93a4ae;
-  --border: #263540;
-  --border-strong: #3a4c58;
-  --accent: #45b7c3;
+  --bg: #0c1114;
+  --surface: #12191e;
+  --canvas: #10171b;
+  --page: #141c21;
+  --fg: #e3eaee;
+  --muted: #8fa1ab;
+  --border: #1f2b33;
+  --border-strong: #31424d;
+  --accent: #4fc1cc;
   --accent-fg: #08181b;
-  --accent-soft: #16363b;
-  --code-bg: #1d2830;
+  --accent-soft: #143238;
+  --code-bg: #18222a;
+  --hover: #1a242b;
   --edge: #8a9ba5;
   --danger: #f2877f;
+  --warn-bg: #3d2412;
+  --warn-fg: #f5a25d;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   color-scheme: dark;
 }
 html, body { height: 100%; margin: 0; }
@@ -65,37 +80,62 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); fon
 .grow { flex: 1; }
 
 /* toolbar */
-.bar { background: var(--surface); border-bottom: 1px solid var(--border); padding-block: 8px; display: flex; flex-direction: column; gap: 8px; }
-.row1, .row2 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.file { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.bar { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
+.row1, .row2 { display: flex; align-items: center; }
+.row1 { min-height: 50px; gap: 10px; }
+.row2 { min-height: 42px; gap: 2px; flex-wrap: wrap; border-top: 1px solid var(--border); }
+.file { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--accent); color: var(--accent-fg); flex: none; }
+.ic { display: block; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.grp { display: inline-flex; align-items: center; gap: 2px; padding-left: 8px; border-left: 1px solid var(--border); }
 .file span#fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
-.dot { font-size: 11px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.dot { font-size: 11px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); white-space: nowrap; }
 .dot[hidden] { display: none; }
-.btn { font: inherit; font-size: 13px; padding: 5px 11px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); border-radius: 6px; cursor: pointer; line-height: 1.3; }
-.btn:hover { background: var(--code-bg); }
+.btn { font: inherit; font-size: 13px; height: 32px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); border-radius: 7px; cursor: pointer; line-height: 1.3; }
+.btn:hover { background: var(--hover); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--hover); color: var(--fg); }
+.btn.ghost.on, .btn.ghost[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.btn.icon { width: 32px; padding: 0; justify-content: center; }
+.btn.ghost:disabled:hover { background: transparent; }
+.badge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #e8a400; color: #1b1300; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
+#bSave { min-width: 74px; justify-content: center; margin-left: 4px; }
+#bSave:not(.primary) { color: var(--muted); border-color: var(--border); background: transparent; }
 .btn:focus-visible, .seg button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .mm:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
 .btn.primary:hover { filter: brightness(1.08); }
-.btn.sm { font-size: 12px; padding: 3px 9px; }
+.btn.sm { font-size: 12px; height: 28px; padding: 0 9px; gap: 5px; }
 .btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .btn.danger { color: var(--danger); }
-.tool { padding: 4px 9px; font-size: 13px; color: var(--muted); border-color: var(--border); }
-.tool:hover { color: var(--fg); }
-.btn.tool.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
-.tool.mono { font-family: var(--font-mono); font-size: 12px; }
-.sep { width: 1px; height: 18px; background: var(--border); margin-inline: 4px; }
-.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
-.seg button { font: inherit; font-size: 13px; padding: 5px 12px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer; }
-.seg button.on { background: var(--code-bg); color: var(--fg); font-weight: 600; }
-#tools.off { opacity: .45; pointer-events: none; }
+.tool { height: 30px; padding: 0 9px; font-size: 13px; color: var(--muted); border-color: transparent; background: transparent; }
+.tool:hover { color: var(--fg); background: var(--hover); }
+.btn.tool.icon { width: 30px; }
+.btn.tool.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sep { width: 1px; height: 18px; background: var(--border); margin-inline: 6px; flex: none; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--code-bg); }
+.seg button { font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+#tools.off { opacity: .35; pointer-events: none; }
+/* diagram menu */
+.dmenu { position: relative; }
+.dmenu > summary { list-style: none; }
+.dmenu > summary::-webkit-details-marker { display: none; }
+.dmenu[open] > summary { background: var(--hover); color: var(--fg); }
+.dmenu-list { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; min-width: 230px; padding: 5px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: var(--shadow); }
+.dmenu-list button { font: inherit; text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 7px 10px; border: 0; border-radius: 7px; background: none; color: var(--fg); cursor: pointer; }
+.dmenu-list button:hover, .dmenu-list button:focus-visible { background: var(--accent-soft); outline: none; }
+.dmenu-list b { font-weight: 600; font-size: 13px; }
+.dmenu-list small { color: var(--muted); font-size: 12px; }
 #confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--accent-soft); border-block: 1px solid var(--border); padding-block: 6px; font-size: 13px; }
 
 /* document */
 #scroll { flex: 1; overflow: auto; min-height: 0; }
-#scroll > .wrap { max-width: var(--colw, 792px); margin: 0 auto; }
-#doc { padding-block: 28px 140px; outline: none; font-family: var(--font-doc, var(--font-ui)); font-size: 16px; line-height: var(--lh, 1.65); min-height: 60vh; overflow-wrap: anywhere; }
-#doc h1 { font-size: 30px; line-height: 1.25; margin: 0 0 14px; font-weight: 600; text-wrap: balance; }
-#doc h2 { font-size: 22px; line-height: 1.3; margin: 28px 0 8px; font-weight: 600; text-wrap: balance; }
+#scroll > .wrap { max-width: var(--colw, 792px); margin: 0 auto; padding-block: 24px 80px; padding-inline: clamp(8px, 2.5vw, 28px); }
+#doc, #srcwrap { background: var(--page); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 48px clamp(20px, 7%, 64px) 120px; }
+#srcwrap { padding-bottom: 48px; }
+#doc { outline: none; font-family: var(--font-doc, var(--font-ui)); font-size: 16px; line-height: var(--lh, 1.65); min-height: 60vh; overflow-wrap: anywhere; }
+#doc h1 { font-size: 32px; line-height: 1.25; letter-spacing: -.01em; margin: 0 0 18px; font-weight: 600; text-wrap: balance; }
+#doc h2 { font-size: 22px; line-height: 1.3; margin: 34px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-weight: 600; text-wrap: balance; }
 #doc h3 { font-size: 18px; margin: 22px 0 6px; font-weight: 600; }
 #doc h4, #doc h5, #doc h6 { font-size: 16px; margin: 18px 0 4px; font-weight: 600; }
 #doc p { margin: 0 0 12px; }
@@ -103,18 +143,20 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); fon
 #doc li { margin: 2px 0; }
 #doc a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 #doc code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
-#doc pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; overflow-x: auto; white-space: pre-wrap; }
+#doc pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; overflow-x: auto; white-space: pre-wrap; }
 #doc pre code { background: none; padding: 0; font-size: var(--code, 13.5px); line-height: 1.55; }
-#doc blockquote { margin: 0 0 12px; padding: 2px 0 2px 14px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+#doc blockquote { margin: 0 0 12px; padding: 8px 14px; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; background: var(--accent-soft); }
+#doc blockquote > :last-child { margin-bottom: 0; }
 #doc hr { border: 0; border-top: 2px solid var(--border-strong); margin: 22px 0; }
-#doc table { border-collapse: collapse; margin: 0 0 14px; display: block; overflow-x: auto; max-width: 100%; }
-#doc th, #doc td { border: 1px solid var(--border-strong); padding: 6px 12px; text-align: left; min-width: 70px; }
+#doc table { border-collapse: separate; border-spacing: 0; border: 1px solid var(--border-strong); border-radius: 8px; margin: 0 0 14px; display: block; overflow-x: auto; max-width: 100%; }
+#doc th, #doc td { border-bottom: 1px solid var(--border); padding: 6px 12px; text-align: left; min-width: 70px; }
 #doc th { background: var(--code-bg); font-weight: 600; }
+#doc tr:last-child > td { border-bottom: 0; }
 #doc img { max-width: 100%; }
-#src { width: 100%; min-height: 70vh; padding: 20px 0 140px; border: 0; outline: none; resize: none; background: transparent; color: var(--fg); font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); tab-size: 4; }
+#src { width: 100%; min-height: calc(100vh - 300px); padding: 0; border: 0; outline: none; resize: none; background: transparent; color: var(--fg); font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); tab-size: 4; }
 
 /* diagram block */
-figure.mm { margin: 18px 0; padding: 0; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); overflow: hidden; outline: none; font-size: 14px; line-height: 1.4; }
+figure.mm { margin: 18px 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; outline: none; font-size: 14px; line-height: 1.4; }
 figure.mm.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .mm-bar { display: none; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; background: var(--accent-soft); border-bottom: 1px solid var(--border); }
 figure.mm.sel .mm-bar { display: flex; }
@@ -122,7 +164,7 @@ figure.mm.sel .mm-bar { display: flex; }
 .mm-f { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .mm-msg { font-size: 12px; color: var(--muted); }
 .mm select, .mm input[type=text] { font: inherit; font-size: 13px; color: var(--fg); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 5px; padding: 3px 7px; min-width: 0; }
-.mm-canvas { padding: 10px 12px; background: var(--canvas); overflow-x: auto; user-select: none; }
+.mm-canvas { padding: 10px 12px; background: var(--canvas) radial-gradient(var(--border) 1px, transparent 1px) 0 0 / 16px 16px; overflow-x: auto; user-select: none; }
 .mm-canvas svg { display: block; margin: 0 auto; width: 100%; height: auto; }
 .mm-empty { padding: 20px; color: var(--muted); text-align: center; }
 .mm-insp { display: none; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 8px 12px 10px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
@@ -155,7 +197,12 @@ figure.mm.sel .mm-insp { display: flex; }
 .handle { fill: var(--accent); stroke: var(--canvas); stroke-width: 2; cursor: crosshair; }
 .dragline { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; pointer-events: none; }
 
-.status { display: flex; align-items: center; gap: 12px; padding-block: 6px; border-top: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--muted); min-height: 30px; }
+.status { display: flex; align-items: center; gap: 12px; padding-block: 4px; border-top: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--muted); min-height: 30px; }
+@media (max-width: 700px) {
+  #scroll > .wrap { padding: 0; }
+  #doc, #srcwrap { border: 0; border-radius: 0; box-shadow: none; padding: 22px 16px 120px; }
+  .seg span, #bCom span:not(.badge) { display: none; }
+}
 @media (max-width: 560px) {
   #doc h1 { font-size: 26px; }
   .file span#fname { max-width: 30vw; }
@@ -195,35 +242,34 @@ figure.mm.sel .mm-insp { display: flex; }
 .grp-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); align-self: center; }
 #doc, #srcwrap { zoom: var(--zoom, 1); }
 #srcwrap { position: relative; }
-#srcnum { display: none; position: absolute; inset: 0; overflow: hidden; pointer-events: none; user-select: none; }
+#srcnum { display: none; position: absolute; inset: 0; padding: inherit; overflow: hidden; pointer-events: none; user-select: none; }
 #srcwrap.nums #srcnum { display: block; }
 #srcwrap.nums #src { padding-left: 3.6em; }
-#srcnumin { font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); padding: 20px 0 140px 3.6em; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
+#srcnumin { font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); padding-left: 3.6em; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
 #srcnumin div { position: relative; color: transparent; }
 #srcnumin div::before { content: attr(data-n); position: absolute; left: -3.6em; width: 3em; text-align: right; color: var(--muted); }
 .bar, #rail, #side, #cpanel, .status, #sharebox, #settings, #histbox { zoom: var(--uizoom, 1); }
 .body { flex: 1; min-height: 0; display: flex; }
 #scroll { flex: 1; min-width: 0; }
-#side { width: 270px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); min-height: 0; }
-.side-head { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
+#side { width: 260px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); min-height: 0; }
+.side-head { display: flex; align-items: center; gap: 6px; min-height: 46px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
 .side-head .btn.sm { height: 24px; display: inline-flex; align-items: center; justify-content: center; }
-.side-name { flex: 1; min-width: 0; font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#rail { width: 30px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); }
+.side-name { flex: 1; min-width: 0; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#rail { width: 44px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 8px; background: var(--surface); border-right: 1px solid var(--border); }
 #rail[hidden] { display: none; }
-.rtab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 14px 0; font: inherit; font-size: 12px; background: none; border: 0; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
-.rtab > span { writing-mode: vertical-rl; }
-.rtab:hover { color: var(--fg); }
-.rtab.on { color: var(--accent); background: var(--accent-soft); box-shadow: inset -2px 0 0 var(--accent); }
+.rtab { width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.rtab:hover { color: var(--fg); background: var(--hover); }
+.rtab.on { color: var(--accent); background: var(--accent-soft); }
 .tree[hidden] { display: none; }
 .tree { flex: 1; overflow: auto; padding: 6px 4px 20px; font-size: 13px; user-select: none; }
 .tree .empty { color: var(--muted); padding: 10px 10px; line-height: 1.5; }
 .tree ul { list-style: none; margin: 0; padding: 0 0 0 12px; }
 .tree > ul { padding-left: 0; }
-.tree .row { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
-.tree .row:hover { background: var(--accent-soft); }
-.tree .row.active { background: var(--accent); color: var(--accent-fg); }
-.tree .row .ic { flex: none; width: 12px; text-align: center; color: var(--muted); font-size: 10px; }
-.tree .row.active .ic { color: var(--accent-fg); }
+.tree .row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg); }
+.tree .row:hover { background: var(--hover); }
+.tree .row.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tree .row .tic { flex: none; width: 14px; display: grid; place-items: center; color: var(--muted); font-size: 10px; }
+.tree .row.active .tic { color: var(--accent); }
 .tree .row .nm { overflow: hidden; text-overflow: ellipsis; }
 .tree .err { color: var(--danger); padding: 3px 8px 3px 26px; font-size: 12px; }
 @media (max-width: 700px) { #side { position: absolute; z-index: 5; height: calc(100% - 0px); box-shadow: 0 0 24px rgba(0,0,0,.25); } .body { position: relative; } }
@@ -235,9 +281,8 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 ::highlight(ml-c) { background-color: rgba(255, 196, 0, .32); }
 ::highlight(ml-cp) { background-color: rgba(120, 160, 255, .4); }
 ::highlight(ml-ca) { background-color: rgba(255, 150, 0, .55); }
-#bCom.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-#cpanel { width: min(330px, 100%); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
-.cbody { flex: 1; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+#cpanel { width: min(340px, 100%); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
+.cbody { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .cactions { display: flex; gap: 6px; flex-wrap: wrap; }
 .cbadge { color: var(--muted); font-weight: 400; }
 #ccompose, #cCopyFallback { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-soft); }
@@ -246,14 +291,19 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 #cCopyText { font-family: var(--font-mono); font-size: 12px; }
 .cquote { font-size: 12px; font-style: italic; color: var(--muted); border-left: 3px solid #e0a800; padding-left: 8px; max-height: 4.6em; overflow: hidden; overflow-wrap: anywhere; }
 .cnote, .chead { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.cempty { color: var(--muted); line-height: 1.5; font-size: 13px; }
+.cempty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 28px 12px; color: var(--muted); line-height: 1.5; font-size: 13px; }
+.cempty b { color: var(--fg); font-size: 14px; }
+.cempty ol { text-align: left; margin: 4px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); color: var(--fg); }
 .clist { display: flex; flex-direction: column; gap: 8px; }
-.citem { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; cursor: pointer; background: var(--surface); }
+.citem { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; cursor: pointer; background: var(--surface); }
 .citem.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .citem.done { opacity: .6; }
 .cmeta { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
 .cline { font-family: var(--font-mono); background: var(--code-bg); border-radius: 4px; padding: 0 5px; }
 .cwarn { color: var(--danger); }
+.chip { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); }
+.citem.lost .cquote { text-decoration: line-through; text-decoration-color: var(--warn-fg); }
 .creply { font-size: 13px; line-height: 1.45; border-left: 3px solid var(--accent); padding-left: 8px; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ctext { font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .crow { display: flex; gap: 6px; }
@@ -268,7 +318,7 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 #diffBody .add { background: rgba(46,160,67,.2); }
 #diffBody .del { background: rgba(248,81,73,.2); }
 #diffBody .gap { color: var(--muted); font-style: italic; }
-#sharebox, #settings, #diffbox, #histbox { position: fixed; top: 52px; right: 12px; z-index: 30; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 70px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.28); overflow: hidden; }
+#sharebox, #settings, #diffbox, #histbox { position: fixed; top: 56px; right: 12px; z-index: 30; width: min(380px, calc(100% - 24px)); max-height: calc(100% - 70px); display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 16px 48px rgba(0,0,0,.18); overflow: hidden; }
 #diffbox { top: auto; bottom: 40px; max-height: 40vh; }
 #diffNav { display: inline-flex; gap: 4px; margin-left: auto; }
 #diffNav[hidden] { display: none; }
@@ -281,7 +331,6 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 #sharebox[hidden], #settings[hidden], #histbox[hidden] { display: none; }
 .btn:disabled { opacity: .4; cursor: default; }
 .btn:disabled:hover { background: var(--surface); }
-#bUndo, #bRedo { padding-inline: 9px; font-size: 15px; line-height: 1.05; }
 #histList { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
 .hitem { padding: 6px 9px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
 .hitem:hover, .hitem:focus-visible { background: var(--accent-soft); outline: none; }
@@ -299,45 +348,78 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
 .shurl code { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; background: none; }
 </style>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 16V5l7 7 7-7v11M4 20h16"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></symbol>
+  <symbol id="i-new" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 12v6M9 15h6"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.2 10H20a2 2 0 0 1 1.9 2.5l-1.5 6A2 2 0 0 1 18.5 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.7.9l.8 1.2a2 2 0 0 0 1.7.9H18a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4a2 2 0 0 0 .7 2.7l.2.1a2 2 0 0 1 1 1.7v.5a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.5a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-com" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-md" viewBox="0 0 24 24"><path d="M4 18V6l4 5 4-5v12M17 6v12M14 15l3 3 3-3"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+  <symbol id="i-ul" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-ol" viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M3 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2H4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3M14 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2h-4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></symbol>
+  <symbol id="i-diag" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="6" rx="1"/><rect x="14" y="15" width="7" height="6" rx="1"/><path d="M6.5 9v3a2 2 0 0 0 2 2h7v1"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
+  <symbol id="i-outline" viewBox="0 0 24 24"><path d="M3 6h18M7 12h14M11 18h10"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+</svg>
 <div id="app">
   <header class="bar">
     <div class="wrap row1">
-      <div class="file"><span id="fname">sample.md</span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
+      <div class="file"><span class="brand"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-logo"/></svg></span><span id="fname">sample.md</span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
       <div class="grow"></div>
-      <button class="btn" id="bUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>&#8630;</button>
-      <button class="btn" id="bRedo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>&#8631;</button>
-      <button class="btn" id="bHist" type="button" title="Every change since you opened this file; click one to bring it back" aria-pressed="false">History</button>
-      <span class="sep"></span>
-      <button class="btn" id="bNew" type="button">New</button>
-      <button class="btn" id="bOpen" type="button">Open</button>
-      <button class="btn primary" id="bSave" type="button" title="Save (Ctrl+S)">Save</button>
-      <button class="btn" id="bSet" type="button" title="Settings (Ctrl+,)" aria-pressed="false">Settings</button>
-      <button class="btn" id="bShare" type="button" title="Let your phone or another computer use this app in a browser" hidden>Share</button>
-      <button class="btn" id="bCom" type="button" title="Review comments (Ctrl+Alt+M adds one on the selection)" aria-pressed="false">Comments</button>
       <div class="seg" role="group" aria-label="View">
-        <button type="button" id="mR" class="on" aria-pressed="true">Rendered</button>
-        <button type="button" id="mS" aria-pressed="false">Source</button>
+        <button type="button" id="mR" class="on" aria-pressed="true"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-eye"/></svg><span>Rendered</span></button>
+        <button type="button" id="mS" aria-pressed="false"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-md"/></svg><span>Source</span></button>
       </div>
+      <div class="grp">
+        <button class="btn ghost icon" id="bUndo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo" disabled><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-undo"/></svg></button>
+        <button class="btn ghost icon" id="bRedo" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-redo"/></svg></button>
+        <button class="btn ghost icon" id="bHist" type="button" title="History: every change since you opened this file" aria-label="History" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-hist"/></svg></button>
+      </div>
+      <div class="grp">
+        <button class="btn ghost icon" id="bNew" type="button" title="New file" aria-label="New file"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-new"/></svg></button>
+        <button class="btn ghost icon" id="bOpen" type="button" title="Open file" aria-label="Open file"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-open"/></svg></button>
+      </div>
+      <div class="grp">
+        <button class="btn ghost" id="bCom" type="button" title="Review comments (Ctrl+Alt+M adds one on the selection)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-com"/></svg><span>Comments</span><span id="bComN" class="badge" hidden></span></button>
+        <button class="btn ghost icon" id="bShare" type="button" title="Share: use this app from your phone or another computer" aria-label="Share" hidden><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-phone"/></svg></button>
+        <button class="btn ghost icon" id="bSet" type="button" title="Settings (Ctrl+,)" aria-label="Settings" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-gear"/></svg></button>
+      </div>
+      <button class="btn primary" id="bSave" type="button" title="Save (Ctrl+S)">Save</button>
     </div>
     <div class="wrap row2" id="tools">
       <button type="button" class="btn tool" data-tool="h1" title="Heading 1">H1</button>
       <button type="button" class="btn tool" data-tool="h2" title="Heading 2">H2</button>
       <button type="button" class="btn tool" data-tool="h3" title="Heading 3">H3</button>
       <span class="sep"></span>
-      <button type="button" class="btn tool" data-tool="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-      <button type="button" class="btn tool" data-tool="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-      <button type="button" class="btn tool mono" data-tool="code" title="Code: select words in a line for inline code; select several lines, or nothing, for a code block">code</button>
+      <button type="button" class="btn tool icon" data-tool="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
+      <button type="button" class="btn tool icon" data-tool="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
+      <button type="button" class="btn tool icon" data-tool="code" title="Code: select words in a line for inline code; select several lines, or nothing, for a code block" aria-label="Code"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-code"/></svg></button>
       <span class="sep"></span>
-      <button type="button" class="btn tool" data-tool="ul">Bullets</button>
-      <button type="button" class="btn tool" data-tool="ol">Numbered</button>
-      <button type="button" class="btn tool" data-tool="quote">Quote</button>
-      <button type="button" class="btn tool" data-tool="table">Table</button>
+      <button type="button" class="btn tool icon" data-tool="ul" title="Bulleted list" aria-label="Bulleted list"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-ul"/></svg></button>
+      <button type="button" class="btn tool icon" data-tool="ol" title="Numbered list" aria-label="Numbered list"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-ol"/></svg></button>
+      <button type="button" class="btn tool icon" data-tool="quote" title="Quote" aria-label="Quote"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-quote"/></svg></button>
+      <button type="button" class="btn tool icon" data-tool="table" title="Table" aria-label="Table"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-table"/></svg></button>
       <span class="sep"></span>
-      <span class="grp-label">Diagram</span>
-      <button type="button" class="btn tool" data-tool="d:flow" title="Insert a flowchart">Flowchart</button>
-      <button type="button" class="btn tool" data-tool="d:arch" title="Insert an architecture diagram with groups">Architecture</button>
-      <button type="button" class="btn tool" data-tool="d:er" title="Insert a database schema (ER) diagram">ER schema</button>
-      <button type="button" class="btn tool" data-tool="d:cls" title="Insert a class diagram">Class</button>
+      <details class="dmenu" id="dmenu">
+        <summary class="btn tool" title="Insert a diagram"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-diag"/></svg><span>Diagram</span><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+        <div class="dmenu-list">
+          <button type="button" data-tool="d:flow"><b>Flowchart</b><small>Steps and decisions</small></button>
+          <button type="button" data-tool="d:arch"><b>Architecture</b><small>Services in groups</small></button>
+          <button type="button" data-tool="d:er"><b>ER schema</b><small>Tables and relations</small></button>
+          <button type="button" data-tool="d:cls"><b>Class</b><small>Classes and members</small></button>
+        </div>
+      </details>
     </div>
     <div class="wrap" id="confirm" hidden>
       <span id="confirmText"></span>
@@ -347,8 +429,8 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
   </header>
   <div class="body">
     <nav id="rail" hidden aria-label="Panels">
-      <button type="button" class="rtab" id="tabFiles" title="Files (Ctrl+\)" aria-pressed="false"><span>Files</span></button>
-      <button type="button" class="rtab" id="tabOutline" title="Outline" aria-pressed="false"><span>Outline</span></button>
+      <button type="button" class="rtab" id="tabFiles" title="Files (Ctrl+\)" aria-label="Files" aria-pressed="false"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-folder"/></svg></button>
+      <button type="button" class="rtab" id="tabOutline" title="Outline" aria-label="Outline" aria-pressed="false"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-outline"/></svg></button>
     </nav>
     <aside id="side" hidden aria-label="Sidebar">
       <div class="side-head">
@@ -376,7 +458,7 @@ figure.fm { margin: 0 0 20px; padding: 8px 12px 10px; border: 1px solid var(--bo
         <div class="cactions">
           <button type="button" class="btn sm primary" id="cAdd" title="Comment on the selected text (Ctrl+Alt+M)">+ Comment on selection</button>
           <button type="button" class="btn sm" id="cCopy" title="Copy a ready-to-paste prompt with the commented passages and their comments">Copy prompt</button>
-          <button type="button" class="btn sm primary" id="cSend" hidden title="Send the open comments to the coding agent that is running markline poll">Send to agent</button>
+          <button type="button" class="btn sm primary" id="cSend" hidden title="Send the open comments to the coding agent that is running markline poll"><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-send"/></svg>Send to agent</button>
           <button type="button" class="btn sm" id="cWrite" title="Save the file and write NAME.md.comments.json next to it, for the Copilot prompt file">Save for Copilot</button>
         </div>
         <div class="cactions" id="cbulk" hidden>

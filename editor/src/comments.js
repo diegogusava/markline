@@ -229,7 +229,8 @@ $('#cClose').addEventListener('click', function () { showPanel(false); });
 function openCount() { return comments.filter(function (c) { return c.status === 'open'; }).length; }
 function updateBadge() {
   const n = openCount();
-  $('#bCom').textContent = n ? 'Comments (' + n + ')' : 'Comments';
+  $('#bComN').textContent = n;
+  $('#bComN').hidden = !n;
   $('#cCount').textContent = comments.length ? '(' + n + ' open)' : '';
   $('#cbulk').hidden = !comments.length;
   $('#cResolveAll').disabled = !n;
@@ -255,7 +256,9 @@ function renderList() {
   const idx = mdIndex(currentMarkdown());
   listEl.textContent = '';
   if (!comments.length) {
-    listEl.appendChild(el('div', 'cempty', 'No comments yet. Select text in the Rendered or Source view and press Ctrl+Alt+M (or click the Comment bubble), then describe the change you want. When you are done, use Copy prompt (paste it into Copilot Chat) or Save for Copilot (then run the apply-comments prompt file).'));
+    const empty = el('div', 'cempty');
+    empty.innerHTML = '<svg class="ic" width="28" height="28"><use href="#i-com"/></svg><b>No comments yet</b><ol><li>Select text in the document.</li><li>Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> and say what should change.</li><li>Press <b>Send to agent</b>, or <b>Copy prompt</b> for Copilot Chat.</li></ol>';
+    listEl.appendChild(empty);
     return;
   }
   const rows = comments.map(function (c) { return { c: c, loc: idx.find(c) }; });
@@ -268,11 +271,12 @@ function renderList() {
   });
 }
 function item(c, loc) {
-  const it = el('div', 'citem' + (c.id === activeId ? ' active' : '') + (c.status === 'applied' || c.status === 'resolved' ? ' done' : ''));
+  const lost = !loc && (c.status === 'open' || c.status === 'sent') && !ranges.has(c.id);
+  const it = el('div', 'citem' + (c.id === activeId ? ' active' : '') + (c.status === 'applied' || c.status === 'resolved' ? ' done' : '') + (lost ? ' lost' : ''));
   it.dataset.id = c.id;
   const meta = el('div', 'cmeta');
   if (loc) meta.appendChild(el('span', 'cline', loc.l1 === loc.l2 ? 'L' + loc.l1 : 'L' + loc.l1 + '-' + loc.l2));
-  else if ((c.status === 'open' || c.status === 'sent') && !ranges.has(c.id)) meta.appendChild(el('span', 'cwarn', 'text not found any more'));
+  else if (lost) meta.appendChild(el('span', 'chip', 'Text changed'));
   if (c.status !== 'open') meta.appendChild(el('span', '', c.status));
   it.appendChild(meta);
   const q = el('div', 'cquote', c.quote);
