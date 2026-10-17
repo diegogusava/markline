@@ -52,22 +52,42 @@ function ctx(raw, a, b) {
 }
 
 /* ---------- markdown side (line numbers, source-view selection) ---------- */
+/* the quote is gone: guess its place from the context saved around it (the text between the old neighbours) */
+function near(hay, len, pre, suf) {
+  pre = qfold(pre).replace(/(?:^|\s)(?:[-+*]|\d+[.)])$/, ''); suf = qfold(suf);
+  function at(t, end) { const out = []; if (t.length < 8) return out; for (let i = hay.s.indexOf(t); i !== -1; i = hay.s.indexOf(t, i + 1)) out.push(end ? i + t.length : i); return out; }
+  const ps = at(pre, true), ss = at(suf, false), max = Math.max(400, len * 4);
+  let r = null;
+  ps.forEach(function (a) { ss.forEach(function (b) { if (b >= a && b - a <= max && (!r || b - a < r.b - r.a)) r = { a: a, b: b }; }); });
+  if (!r && ps.length) r = { a: ps[0], b: Math.min(hay.s.length, ps[0] + len) };
+  if (!r && ss.length) r = { a: Math.max(0, ss[0] - len), b: ss[0] };
+  if (!r) return null;
+  while (r.a < r.b && hay.s[r.a] === ' ') r.a++;
+  while (r.b > r.a && hay.s[r.b - 1] === ' ') r.b--;
+  r.approx = true;
+  return r;
+}
+/* where comment c sits in folded text: exact quote, else its head and tail, else the closest match */
+function place(hay, c) {
+  const q = qfold(c.quote), pre = c.pre || '', suf = c.suf || '';
+  let r = locate(hay, q, pre, suf);
+  if (!r && q.length > 40) {
+    const h = locate(hay, q.slice(0, 40), pre, ''), t = locate(hay, q.slice(-40), '', suf);
+    if (h && t && t.b >= h.a) r = { a: h.a, b: t.b };
+  }
+  return r || near(hay, q.length, pre, suf);
+}
 function mdIndex(md) {
   const hay = fold(md, mdKeep(md));
   function line(i) { let n = 1; for (let p = md.indexOf('\n'); p !== -1 && p < i; p = md.indexOf('\n', p + 1)) n++; return n; }
   return {
     find: function (c) {
-      const q = qfold(c.quote);
-      let r = locate(hay, q, c.pre || '', c.suf || '');
-      if (!r && q.length > 40) {
-        const h = locate(hay, q.slice(0, 40), c.pre || '', ''), t = locate(hay, q.slice(-40), '', c.suf || '');
-        if (h && t && t.b >= h.a) r = { a: h.a, b: t.b };
-      }
-      if (!r) return null;
-      const s = hay.map[r.a], e = hay.map[r.b - 1] + 1;
-      return { s: s, e: e, l1: line(s), l2: line(e - 1) };
+      const r = place(hay, c);
+      if (!r || !hay.map.length) return null;
+      const s = hay.map[Math.min(r.a, hay.map.length - 1)], e = r.b > r.a ? hay.map[r.b - 1] + 1 : s;
+      return { s: s, e: e, l1: line(s), l2: line(Math.max(s, e - 1)), approx: !!r.approx };
     }
   };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { fold: fold, qfold: qfold, mdKeep: mdKeep, locate: locate, ctx: ctx, mdIndex: mdIndex };
+if (typeof module !== 'undefined' && module.exports) module.exports = { fold: fold, qfold: qfold, mdKeep: mdKeep, locate: locate, place: place, ctx: ctx, mdIndex: mdIndex };

@@ -50,9 +50,9 @@ function docRanges() {
   if (mode !== 'rendered') return out;
   const flat = flatDoc(), hay = fold(flat.s);
   comments.forEach(function (c) {
-    const r = locate(hay, qfold(c.quote), c.pre || '', c.suf || '');
-    if (!r) return;
-    const a = flatToPoint(flat, hay.map[r.a], false), b = flatToPoint(flat, hay.map[r.b - 1] + 1, true);
+    const r = place(hay, c);
+    if (!r || !hay.map.length) return;
+    const a = flatToPoint(flat, hay.map[Math.min(r.a, hay.map.length - 1)], false), b = r.b > r.a ? flatToPoint(flat, hay.map[r.b - 1] + 1, true) : a;
     if (!a || !b) return;
     const rg = document.createRange();
     try { rg.setStart(a.node, a.off); rg.setEnd(b.node, b.off); out.set(c.id, rg); } catch (e) { /* ignore */ }
@@ -203,12 +203,16 @@ function renderList() {
   });
 }
 function item(c, loc) {
-  const lost = !loc && (c.status === 'open' || c.status === 'sent') && !ranges.has(c.id);
+  const live = c.status === 'open' || c.status === 'sent';
+  const moved = live && loc && loc.approx, lost = moved || (live && !loc && !ranges.has(c.id));
   const it = el('div', 'citem' + (c.id === activeId ? ' active' : '') + (c.status === 'applied' || c.status === 'resolved' ? ' done' : '') + (lost ? ' lost' : ''));
   it.dataset.id = c.id;
   const meta = el('div', 'cmeta');
-  if (loc) meta.appendChild(el('span', 'cline', loc.l1 === loc.l2 ? 'L' + loc.l1 : 'L' + loc.l1 + '-' + loc.l2));
-  else if (lost) meta.appendChild(el('span', 'chip', 'Text changed'));
+  if (loc) meta.appendChild(el('span', 'cline', (moved ? '~' : '') + (loc.l1 === loc.l2 ? 'L' + loc.l1 : 'L' + loc.l1 + '-' + loc.l2)));
+  if (lost) {
+    const chip = meta.appendChild(el('span', 'chip', moved ? 'Text changed' : 'Text not found'));
+    chip.title = moved ? 'The quoted text was edited. Click the comment to go to the closest match.' : 'The quoted text and the text around it are gone.';
+  }
   if (c.status !== 'open') meta.appendChild(el('span', '', c.status));
   it.appendChild(meta);
   if (c.was) it.appendChild(el('div', 'cquote cwas', c.was));
