@@ -130,18 +130,92 @@ function updateCount() {
    Each file keeps its own list for the session, so switching files and coming back keeps the history. */
 const HIST_MAX = 500;
 const histStore = {};
-let H = { list: [], hi: -1 }, histTimer = null, histPending = false;
+let H = { list: [], hi: -1 }, histTimer = null, histPending = false, histStart = 0, idleCaret = null, pendingBeforeCaret = null;
 function histKey() { return fileHandle && fileHandle.native || null; }
+function snapHtml() {
+  doc.querySelectorAll('figure.fm textarea').forEach(function (t) { t.textContent = t.value; });
+  return doc.innerHTML;
+}
+function encodePt(node, off) {
+  const path = [off];
+  let n = node;
+  while (n && n !== doc) {
+    const p = n.parentNode;
+    if (!p) return null;
+    path.push(Array.prototype.indexOf.call(p.childNodes, n));
+    n = p;
+  }
+  return n === doc ? path.reverse() : null;
+}
+function decodePt(path) {
+  if (!path || path.length < 1) return null;
+  let n = doc;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (!n.childNodes || !n.childNodes.length) break;
+    const idx = Math.min(Math.max(0, path[i]), n.childNodes.length - 1);
+    n = n.childNodes[idx];
+  }
+  const max = n.nodeType === 3 ? n.data.length : (n.childNodes ? n.childNodes.length : 0);
+  return { node: n, off: Math.min(Math.max(0, path[path.length - 1]), max) };
+}
+function readCaret() {
+  if (mode === 'source') return { srcStart: srcEl.selectionStart, srcEnd: srcEl.selectionEnd };
+  const s = window.getSelection();
+  if (!s.rangeCount || !s.anchorNode || !doc.contains(s.anchorNode)) return null;
+  const el = s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode;
+  if (el && el.closest && el.closest('.mm,.fm')) return null;
+  const r = s.getRangeAt(0), sp = encodePt(r.startContainer, r.startOffset), ep = encodePt(r.endContainer, r.endOffset);
+  return sp && ep ? { s: sp, e: ep } : null;
+}
+function restoreCaret(c) {
+  if (mode === 'source') {
+    srcEl.focus({ preventScroll: true });
+    if (c && c.srcStart != null) srcEl.setSelectionRange(c.srcStart, c.srcEnd != null ? c.srcEnd : c.srcStart);
+    return true;
+  }
+  if (!c || !c.s) return false;
+  const sp = decodePt(c.s), ep = decodePt(c.e || c.s);
+  if (!sp || !ep) return false;
+  try {
+    const r = document.createRange();
+    r.setStart(sp.node, sp.off);
+    r.setEnd(ep.node, ep.off);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    doc.focus({ preventScroll: true });
+    return true;
+  } catch (e) { return false; }
+}
+document.addEventListener('selectionchange', function () {
+  if (!histPending) { const c = readCaret(); if (c) idleCaret = c; }
+});
+['keyup', 'mouseup', 'select'].forEach(function (ev) {
+  srcEl.addEventListener(ev, function () { if (!histPending && mode === 'source') idleCaret = readCaret(); });
+});
+function onBeforeEdit(e) {
+  if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
+    const t = e.target, el = t && t.nodeType === 3 ? t.parentElement : t;
+    if (el && el !== srcEl && el.closest && el.closest('textarea,input')) return;
+    e.preventDefault();
+    histGo(e.inputType === 'historyRedo' ? 1 : -1);
+    return;
+  }
+  if (!histPending) pendingBeforeCaret = readCaret() || idleCaret;
+}
+doc.addEventListener('beforeinput', onBeforeEdit);
+srcEl.addEventListener('beforeinput', onBeforeEdit);
 function histReset() {
-  clearTimeout(histTimer); histPending = false;
-  const md = currentMarkdown(), key = histKey(), old = key && histStore[key];
+  clearTimeout(histTimer); histPending = false; pendingBeforeCaret = null; idleCaret = null;
+  const md = currentMarkdown(), html = mode === 'rendered' ? snapHtml() : null, key = histKey(), old = key && histStore[key];
   if (old && old.list.length) {
     H = old;
     // the file changed on disk since we last saw it (an agent edited it, or Reload): keep the old versions and add this one
-    if (H.list[H.list.length - 1].md !== md) { H.list.push({ md: md, t: Date.now(), why: 'reload' }); histTrim(); }
+    if (H.list[H.list.length - 1].md !== md) { H.list.push({ md: md, html: html, t: Date.now(), why: 'reload' }); histTrim(); }
+    else if (html != null) H.list[H.list.length - 1].html = html;
     H.hi = H.list.length - 1;
   } else {
-    H = { list: [{ md: md, t: Date.now(), why: 'open' }], hi: 0 };
+    H = { list: [{ md: md, html: html, t: Date.now(), why: 'open' }], hi: 0 };
     if (key) histStore[key] = H;
   }
   histUi();
@@ -149,33 +223,79 @@ function histReset() {
 function histTrim() { while (H.list.length > HIST_MAX) { H.list.shift(); H.hi--; } }
 function histAdd(entry) { H.list.length = H.hi + 1; H.list.push(entry); H.hi = H.list.length - 1; histTrim(); }
 function histPush() {
-  clearTimeout(histTimer); histPending = false;
+  clearTimeout(histTimer);
+  const wasPending = histPending;
+  histPending = false;
   if (H.hi < 0) { histUi(); return; }
-  const md = currentMarkdown();
-  if (md !== H.list[H.hi].md) histAdd({ md: md, t: Date.now(), why: 'edit' });
+  const md = currentMarkdown(), html = mode === 'rendered' ? snapHtml() : null, cur = H.list[H.hi];
+  if (md !== cur.md || (wasPending && mode === 'rendered' && html !== cur.html)) {
+    const ac = readCaret() || idleCaret;
+    histAdd({ md: md, html: html, beforeCaret: pendingBeforeCaret || cur.afterCaret, afterCaret: ac, t: Date.now(), why: 'edit' });
+  }
+  pendingBeforeCaret = null;
+  idleCaret = readCaret() || idleCaret;
   histUi();
 }
-// show a snapshot, keeping the scroll position and putting the caret at the first block that changed
-function histShow(md) {
-  clearTimeout(histTimer); histPending = false;
-  const sc = $('#scroll'), top = sc.scrollTop;
+// show a snapshot, keeping the scroll position and restoring the exact caret position
+function histShow(entry, caret) {
+  clearTimeout(histTimer); histPending = false; pendingBeforeCaret = null;
+  const md = entry.md, sc = $('#scroll'), top = sc.scrollTop, sTop = srcEl.scrollTop;
   if (mode === 'source') {
     srcEl.value = md;
     numbers();
-    srcEl.focus();
+    restoreCaret(caret);
+    srcEl.scrollTop = sTop;
   } else {
-    const before = Array.from(doc.children).map(function (c) { return c.outerHTML; });
-    loadMarkdown(md);
-    resolveImages();
+    let changedIdx = -1;
+    if (entry.html != null) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = entry.html;
+      const curKids = Array.from(doc.children), newKids = Array.from(tmp.children);
+      let p = 0, s = 0;
+      while (p < curKids.length && p < newKids.length && curKids[p].outerHTML === newKids[p].outerHTML) p++;
+      while (s < curKids.length - p && s < newKids.length - p && curKids[curKids.length - 1 - s].outerHTML === newKids[newKids.length - 1 - s].outerHTML) s++;
+      for (let i = curKids.length - 1 - s; i >= p; i--) curKids[i].remove();
+      const anchor = doc.children[p] || null;
+      const inserted = newKids.slice(p, newKids.length - s);
+      inserted.forEach(function (el) { doc.insertBefore(el, anchor); });
+      inserted.forEach(function (el) {
+        if (el.matches('figure.fm')) {
+          const t = el.querySelector('textarea');
+          if (t) {
+            t.value = t.textContent;
+            const fit = function () { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
+            t.addEventListener('input', fit);
+            setTimeout(fit, 0);
+          }
+        }
+        if (el.matches('figure.mm')) initBlock(el);
+        el.querySelectorAll('figure.mm').forEach(initBlock);
+        el.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.removeAttribute('disabled'); });
+      });
+      if (p < doc.children.length) changedIdx = p;
+      lastBlocks = { els: Array.from(doc.children), html: Array.from(doc.children, function (c) { return c.outerHTML; }) };
+    } else {
+      const before = Array.from(doc.children).map(function (c) { return c.outerHTML; });
+      loadMarkdown(md);
+      resolveImages();
+      const kids = Array.from(doc.children);
+      let i = 0;
+      while (i < kids.length && i < before.length && kids[i].outerHTML === before[i]) i++;
+      if (i < kids.length) changedIdx = i;
+      entry.html = snapHtml();
+    }
     if (window.reapplyChanges) window.reapplyChanges();
-    const kids = Array.from(doc.children);
-    let i = 0;
-    while (i < kids.length && i < before.length && kids[i].outerHTML === before[i]) i++;
-    const at = kids[Math.min(i, kids.length - 1)];
-    if (at) { const r = document.createRange(); r.selectNodeContents(at); r.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
-    doc.focus();
+    if (!restoreCaret(caret)) {
+      if (changedIdx >= 0 && doc.children[changedIdx] && !doc.children[changedIdx].matches('figure.mm,figure.fm')) {
+        const at = doc.children[changedIdx], r = document.createRange();
+        r.selectNodeContents(at); r.collapse(false);
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      }
+      doc.focus({ preventScroll: true });
+    }
   }
   sc.scrollTop = top;
+  idleCaret = readCaret() || caret || idleCaret;
   dirty = currentMarkdown() !== cleanMd;
   updateStatus();
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 900);
@@ -185,8 +305,9 @@ function histGo(step) {
   histPush();
   const n = H.hi + step;
   if (H.hi < 0 || n < 0 || n >= H.list.length) return;
+  const caret = step < 0 ? (H.list[H.hi].beforeCaret || H.list[n].afterCaret) : (H.list[n].afterCaret || H.list[n].beforeCaret);
   H.hi = n;
-  histShow(H.list[n].md);
+  histShow(H.list[n], caret);
   histUi();
 }
 // bring back an older version as a new entry at the end, so nothing is lost (not even undone versions)
@@ -194,8 +315,10 @@ function histRestore(i) {
   histPush();
   const e = H.list[i];
   if (!e || i === H.hi) return;
-  H.list.push({ md: e.md, t: Date.now(), why: 'restore', from: e.t }); H.hi = H.list.length - 1; histTrim();
-  histShow(e.md);
+  const bc = readCaret() || idleCaret;
+  H.list.push({ md: e.md, html: e.html, beforeCaret: bc, afterCaret: e.afterCaret || e.beforeCaret, t: Date.now(), why: 'restore', from: e.t });
+  H.hi = H.list.length - 1; histTrim();
+  histShow(H.list[H.hi], e.afterCaret || e.beforeCaret);
   histUi();
   toast('Restored the version from ' + histTime(e.t));
 }
@@ -203,11 +326,12 @@ document.addEventListener('keydown', function (e) {
   if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
   const k = e.key.toLowerCase();
   if (k !== 'z' && k !== 'y') return;
-  const t = e.target;
-  if (t !== srcEl && t && t.closest && (t.closest('textarea,input') || !(t === document.body || doc.contains(t)))) return;
+  const t = e.target, el = t && t.nodeType === 3 ? t.parentElement : t;
+  if (el && el !== srcEl && el.closest && el.closest('textarea,input')) return;
   e.preventDefault();
+  e.stopPropagation();
   histGo(k === 'y' || e.shiftKey ? 1 : -1);
-});
+}, true);
 
 /* ---------- history panel ---------- */
 const histBox = $('#histbox');
@@ -279,8 +403,13 @@ $('#histClose').addEventListener('click', function () { toggleHist(false); });
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !histBox.hidden) toggleHist(false); });
 
 function markDirty() {
-  clearTimeout(histTimer); histTimer = setTimeout(histPush, 500);
-  if (!histPending) { histPending = true; histUi(); }
+  if (!histPending) {
+    if (!pendingBeforeCaret) pendingBeforeCaret = idleCaret || readCaret();
+    histStart = Date.now();
+    histPending = true;
+    histUi();
+  }
+  clearTimeout(histTimer); histTimer = setTimeout(histPush, 350);
   dirty = true; updateStatus();
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 900);
   clearTimeout(countTimer); countTimer = setTimeout(updateCount, 300);
@@ -743,7 +872,10 @@ function setMode(next) {
 }
 $('#mR').addEventListener('click', function () { setMode('rendered'); });
 $('#mS').addEventListener('click', function () { setMode('source'); });
-srcEl.addEventListener('input', markDirty);
+srcEl.addEventListener('input', function (e) {
+  markDirty();
+  if (histPending && Date.now() - histStart > 1200 && (e.data === ' ' || e.inputType === 'insertLineBreak')) histPush();
+});
 
 /* ---------- editing ---------- */
 let saved = null;
@@ -923,8 +1055,10 @@ function insertDiagram(kind) {
 }
 function runTool(t) {
   if (mode !== 'rendered') return;
-  if (t.indexOf('d:') === 0) { focusDoc(); insertDiagram(t.slice(2)); markDirty(); return; }
+  histPush();
   focusDoc();
+  const bc = readCaret() || idleCaret;
+  if (t.indexOf('d:') === 0) { insertDiagram(t.slice(2)); pendingBeforeCaret = bc; markDirty(); histPush(); return; }
   switch (t) {
     case 'h1': case 'h2': case 'h3': toggleBlock(t); break;
     case 'bold': document.execCommand('bold'); break;
@@ -935,7 +1069,9 @@ function runTool(t) {
     case 'quote': toggleBlock('blockquote'); break;
     case 'table': insertTable(); break;
   }
+  pendingBeforeCaret = bc;
   markDirty();
+  histPush();
   updateToolState();
 }
 function updateToolState() {
@@ -1064,27 +1200,32 @@ function applyInline() {
 doc.addEventListener('keydown', function (e) {
   if (e.target !== doc && e.target.closest && e.target.closest('.mm')) return;
   if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === ' ') { if (spaceShortcut()) { e.preventDefault(); markDirty(); } }
-  else if (e.key === 'Enter' && !e.shiftKey) { if (enterShortcut()) { e.preventDefault(); markDirty(); } }
+  if (e.key === ' ') { if (spaceShortcut()) { e.preventDefault(); markDirty(); histPush(); } }
+  else if (e.key === 'Enter' && !e.shiftKey) { if (enterShortcut()) { e.preventDefault(); markDirty(); histPush(); } }
 });
 doc.addEventListener('input', function (e) {
   if (e.target !== doc && e.target.closest && e.target.closest('.mm')) return;
   if (e.inputType === 'insertText') applyInline();
   markDirty();
+  if (histPending && Date.now() - histStart > 1200 && (e.data === ' ' || e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak')) histPush();
 });
-doc.addEventListener('mmchange', markDirty);
+doc.addEventListener('mmchange', function () { markDirty(); histPush(); });
 doc.addEventListener('paste', function (e) {
   if (e.target !== doc && e.target.closest && e.target.closest('.mm')) return;
   const text = e.clipboardData && e.clipboardData.getData('text/plain');
   if (!text) return;
   e.preventDefault();
-  if (text.indexOf('\n') < 0) { document.execCommand('insertText', false, text); return; }
+  histPush();
+  const bc = readCaret() || idleCaret;
+  if (text.indexOf('\n') < 0) { document.execCommand('insertText', false, text); pendingBeforeCaret = bc; markDirty(); histPush(); return; }
   document.execCommand('insertHTML', false, sanitize(marked.parse(text, MARKED_OPTS)));
   doc.querySelectorAll('figure.mm').forEach(initBlock);
   ensureParagraphs();
+  pendingBeforeCaret = bc;
   markDirty();
+  histPush();
 });
-doc.addEventListener('change', function (e) { if (e.target.type === 'checkbox') markDirty(); });
+doc.addEventListener('change', function (e) { if (e.target.type === 'checkbox') { markDirty(); histPush(); } });
 
 /* ---------- start ---------- */
 const SAMPLE = [
