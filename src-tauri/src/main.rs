@@ -14,12 +14,13 @@ fn file_name(p: &Path) -> String {
     p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "untitled.md".into())
 }
 fn read(p: &Path) -> Result<Opened, String> {
-    let text = std::fs::read_to_string(p).map_err(|e| e.to_string())?;
-    Ok(Opened { path: p.to_string_lossy().into_owned(), name: file_name(p), text })
+    let p = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    Ok(Opened { path: p.to_string_lossy().into_owned(), name: file_name(&p), text })
 }
 
 #[tauri::command]
-fn open_file(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
+async fn open_file(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
     let pick = app.dialog().file().add_filter("Markdown", &["md", "markdown", "txt"]).blocking_pick_file();
     match pick {
         Some(fp) => { let p = fp.into_path().map_err(|e| e.to_string())?; read(&p).map(Some) }
@@ -28,7 +29,7 @@ fn open_file(app: tauri::AppHandle) -> Result<Option<Opened>, String> {
 }
 
 #[tauri::command]
-fn save_file(app: tauri::AppHandle, path: Option<String>, suggested: String, text: String) -> Result<Option<Saved>, String> {
+async fn save_file(app: tauri::AppHandle, path: Option<String>, suggested: String, text: String) -> Result<Option<Saved>, String> {
     let target = match path {
         Some(p) => Path::new(&p).to_path_buf(),
         None => {
@@ -44,7 +45,7 @@ fn save_file(app: tauri::AppHandle, path: Option<String>, suggested: String, tex
 struct Entry { name: String, path: String, is_dir: bool }
 
 #[tauri::command]
-fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     match app.dialog().file().blocking_pick_folder() {
         Some(fp) => Ok(Some(fp.into_path().map_err(|e| e.to_string())?.to_string_lossy().into_owned())),
         None => Ok(None),
