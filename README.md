@@ -101,7 +101,7 @@ Flags: `--root DIR`, `--port N` (default 8080), `--lan`, `--token T`, `--no-open
 
 ### Agent review loop
 
-1. In the browser, select text, add comments, then press **Send to agent** in the Comments panel.
+1. In the browser or the desktop app, select text, add comments, then press **Send to agent** in the Comments panel.
 2. The agent runs `poll`, edits the file in place, then runs `reply --batch ID "..."`.
 3. The page reloads about 2 seconds after the save (unless you have unsaved edits) and shows the reply under each comment: *Waiting for the agent*, then *Applied*.
 

@@ -563,8 +563,7 @@ $('#cReload').addEventListener('click', function () {
   guard(function () { reloadFile(false); });
 });
 
-/* ---------- browser mode: send to a CLI agent, and follow changes on disk ---------- */
-const WEB = !!window.__MARKLINE_WEB__;
+/* ---------- send to a CLI agent, and follow changes on disk ---------- */
 let base = { file: 0, sidecar: 0 }, polling = false, warned = false;
 async function statNow() {
   const p = fileHandle && fileHandle.native;
@@ -586,7 +585,7 @@ async function tick() {
   } finally { polling = false; }
 }
 window.addEventListener('focus', tick);
-if (WEB) {
+if (TAURI) {
   setInterval(tick, 2000);
   $('#cSend').hidden = false;
   $('#cSend').addEventListener('click', async function () {

@@ -108,6 +108,9 @@ fn web_stop(state: tauri::State<web::Web>) -> web::Info { state.stop() }
 fn web_status(state: tauri::State<web::Web>) -> web::Info { state.status() }
 
 #[tauri::command]
+async fn send_batch(state: tauri::State<'_, web::Web>, path: String) -> Result<serde_json::Value, String> { cli::send(&state, &path) }
+
+#[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     if !(url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:")) { return Err("Unsupported link".into()); }
     #[cfg(target_os = "windows")]
@@ -145,7 +148,7 @@ fn main() {
     tauri::Builder::default()
         .manage(web::Web::default())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, stat, web_start, web_stop, web_status, open_url])
+        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, stat, web_start, web_stop, web_status, send_batch, open_url])
         .run(tauri::generate_context!())
         .expect("error while running Markline");
 }

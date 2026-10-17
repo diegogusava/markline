@@ -141,6 +141,20 @@ fn open(a: &Args) -> i32 {
     0
 }
 
+/// Desktop "Send to agent": queue the file's open comments on the server `poll` waits on, starting one in the file's folder if none runs.
+pub fn send(w: &Web, path: &str) -> Result<Value, String> {
+    let file = Path::new(path).canonicalize().map_err(|e| format!("{}: {}", path, e))?;
+    let s = match alive() {
+        Some(s) => s,
+        None => {
+            w.start(file.parent().unwrap_or(Path::new(".")).to_string_lossy().into_owned(), 0, false, None)?;
+            alive().ok_or("The Markline server did not start.")?
+        }
+    };
+    if !file.starts_with(&s.root) { return Err(format!("The running Markline server only serves {}. Stop it (markline stop) or open a file inside that folder.", s.root.display())); }
+    Ok(http(&s, "POST", "/api/send_batch", Some(&json!({"path": file})), Duration::from_secs(10))?["result"].clone())
+}
+
 fn poll(a: &Args) -> i32 {
     let s = match need_server() { Ok(s) => s, Err(c) => return c };
     let secs: u64 = a.flags.get("timeout").and_then(|t| t.parse().ok()).unwrap_or(600);
@@ -186,7 +200,25 @@ fn reply(a: &Args) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::run;
+    use super::*;
+
+    #[test]
+    fn desktop_send_starts_a_server_and_queues_the_open_comments_for_poll() {
+        let dir = std::env::temp_dir().join(format!("markline-send-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("HOME", &dir);
+        let doc = dir.join("doc.md");
+        std::fs::write(&doc, "# Title\n").unwrap();
+        std::fs::write(dir.join("doc.md.comments.json"), json!({"version": 1, "file": "doc.md", "comments": [
+            {"id": "c1", "status": "open", "startLine": 1, "endLine": 1, "quote": "Title", "comment": "rename"}
+        ]}).to_string()).unwrap();
+
+        let sent = send(&Web::default(), &doc.to_string_lossy()).unwrap();
+
+        let s = alive().unwrap();
+        let got = http(&s, "GET", "/api/poll?timeout=1", None, Duration::from_secs(5)).unwrap();
+        assert_eq!((sent["count"].clone(), got["batch"]["comments"][0]["comment"].clone()), (json!(1), json!("rename")));
+    }
 
     #[test]
     fn help_flag_prints_usage_instead_of_opening_the_app() {
