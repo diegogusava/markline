@@ -7,7 +7,7 @@ const { gfm } = require('turndown-plugin-gfm');
 const createMarkdownConverter = require('../editor/src/markdown');
 
 const convert = html => createMarkdownConverter(TurndownService, gfm).turndown(html);
-const render = md => marked.parse(md, { mangle: false, headerIds: false });
+const render = md => createMarkdownConverter.renderMarkdown(marked, md, { mangle: false, headerIds: false });
 const document = html => domino.createWindow(html).document;
 const cells = html => Array.from(document(html).querySelectorAll('tr'), row =>
   Array.from(row.querySelectorAll('th,td'), cell => cell.innerHTML));
@@ -66,4 +66,18 @@ test('keeps existing list and Mermaid conversion', () => {
   const md = convert(html);
   assert.match(md, /3\. Three\n4\. Four/);
   assert.ok(md.includes('```mermaid\nflowchart LR\nA-->B\n```'));
+});
+
+const post = '## Qual parada?\n\n' +
+  '<p class="text-sm">Foto: <a href="https://example.com/a.jpg">Eduardo P</a>.</p>\n\n' +
+  'Texto com **negrito**.\n\n' +
+  '<table class="beach-comparison">\n  <thead>\n    <tr><th scope="col">Lugar</th></tr>\n  </thead>\n' +
+  '  <tbody>\n    <tr><td data-label="Lugar">Caracol</td></tr>\n  </tbody>\n</table>\n\n' +
+  '<figure>\n\n![Catedral de Pedra](images/catedral.jpg)\n\n' +
+  '<figcaption class="photo-credit">Foto: Shutterstock</figcaption>\n\n</figure>\n\n' +
+  '<!--more-->\n\n' +
+  'Fim.\n';
+
+test('raw HTML blocks survive a save untouched', () => {
+  assert.equal(convert(render(post)).trim(), post.trim());
 });

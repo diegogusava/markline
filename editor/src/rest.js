@@ -44,12 +44,12 @@ function ensureParagraphs() {
   if (!doc.firstElementChild) { doc.appendChild(p()); return; }
   let first = doc.firstElementChild;
   if (first.matches('figure.fm')) { first = first.nextElementSibling; if (!first) { doc.appendChild(p()); return; } }
-  if (first.matches('figure.mm,table,pre,hr')) doc.insertBefore(p(), first);
+  if (first.matches('figure.mm,div.raw,table,pre,hr')) doc.insertBefore(p(), first);
   Array.from(doc.querySelectorAll(':scope > figure.mm')).forEach(function (f) {
     const nx = f.nextElementSibling;
     if (!nx || nx.matches('figure.mm')) f.after(p());
   });
-  if (doc.lastElementChild.matches('figure.mm,table,pre,hr')) doc.appendChild(p());
+  if (doc.lastElementChild.matches('figure.mm,div.raw,table,pre,hr')) doc.appendChild(p());
 }
 /* YAML front matter (--- ... --- at the very top, as in SKILL.md files) is kept verbatim in its own box */
 const FM_RE = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/;
@@ -79,13 +79,13 @@ function blockHtml(html) {
 let lastBlocks = { els: [], html: [] };
 function renderBlocks(md) {
   const m = FM_RE.exec(md);
-  return blockHtml(sanitize(marked.parse(m ? md.slice(m[0].length) : md, MARKED_OPTS)));
+  return blockHtml(sanitize(renderMarkdown(marked, m ? md.slice(m[0].length) : md, MARKED_OPTS)));
 }
 function loadMarkdown(md) {
   let fm = null;
   const m = FM_RE.exec(md);
   if (m) { fm = m[1]; md = md.slice(m[0].length); }
-  const html = sanitize(marked.parse(md, MARKED_OPTS));
+  const html = sanitize(renderMarkdown(marked, md, MARKED_OPTS));
   doc.innerHTML = html;
   lastBlocks = { els: Array.from(doc.children), html: blockHtml(html) };
   if (fm !== null) doc.insertBefore(fmFigure(fm), doc.firstChild);
