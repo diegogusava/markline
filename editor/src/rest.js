@@ -843,13 +843,15 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
   // a file opened some other way (Open..., command line) inside the open folder gets highlighted too
   root = lsGet(RKEY);
   window.marklineRoot = function () { return root; };
-  if (lsGet(OKEY) === '1') { side.hidden = false; render(); }
+  // on a phone the panel covers the document, so it only opens on request
+  const narrow = window.matchMedia('(max-width: 700px)').matches;
+  if (lsGet(OKEY) === '1' && !narrow) { side.hidden = false; render(); }
   setTab(lsGet(TKEY) === 'outline' ? 'outline' : 'files');
   // launched on a folder (`markline DIR` or "Open With Markline" in the file manager): show it in the Files panel
   TAURI.invoke('initial_folder').then(function (p) {
     if (!p) return;
     root = p; open.clear(); lsSet(RKEY, p);
-    setTab('files'); showPanel(true); render();
+    setTab('files'); if (!narrow) showPanel(true); render();
   }).catch(function () {});
 })();
 
