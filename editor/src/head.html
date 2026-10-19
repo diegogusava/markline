@@ -88,7 +88,12 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); fon
 .brand { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--accent); color: var(--accent-fg); flex: none; }
 .ic { display: block; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .grp { display: inline-flex; align-items: center; gap: 2px; padding-left: 8px; border-left: 1px solid var(--border); }
+.fnames { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .file span#fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+/* the full path, cut at the start so the folder and file name stay visible */
+#fpath { font-size: 11px; font-weight: 400; color: var(--muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; direction: rtl; text-align: left; cursor: pointer; }
+#fpath:hover { color: var(--fg); }
+#fpath[hidden] { display: none; }
 .dot { font-size: 11px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); white-space: nowrap; }
 .dot[hidden] { display: none; }
 .btn { font: inherit; font-size: 13px; height: 32px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--fg); border-radius: 7px; cursor: pointer; line-height: 1.3; }
@@ -143,7 +148,7 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); fon
 #doc li { margin: 2px 0; }
 #doc a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 #doc code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
-#doc pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; overflow-x: auto; white-space: pre-wrap; }
+#doc pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; overflow-x: auto; white-space: pre-wrap; tab-size: 4; }
 #doc pre code { background: none; padding: 0; font-size: var(--code, 13.5px); line-height: 1.55; }
 #doc blockquote { margin: 0 0 12px; padding: 8px 14px; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; background: var(--accent-soft); }
 #doc blockquote > :last-child { margin-bottom: 0; }
@@ -217,7 +222,7 @@ figure.mm.sel .mm-insp { display: flex; }
 }
 @media (max-width: 560px) {
   #doc h1 { font-size: 26px; }
-  .file span#fname { max-width: 30vw; }
+  .file span#fname, #fpath { max-width: 30vw; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .btn, figure.mm { transition: background .12s, border-color .12s, box-shadow .12s; }
@@ -389,7 +394,7 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
 <div id="app">
   <header class="bar">
     <div class="wrap row1">
-      <div class="file"><span class="brand"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-logo"/></svg></span><span id="fname">sample.md</span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
+      <div class="file"><span class="brand"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-logo"/></svg></span><span class="fnames"><span id="fname">sample.md</span><span id="fpath" hidden></span></span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
       <div class="grow"></div>
       <div class="seg" role="group" aria-label="View">
         <button type="button" id="mR" class="on" aria-pressed="true"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-eye"/></svg><span>Rendered</span></button>

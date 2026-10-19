@@ -6,7 +6,7 @@ A Markdown editor for people who review documents with a coding agent. You write
 
 ## What it does
 
-- **Write in the rendered view.** Headings, lists, tables, code and front matter are edited in place, and saved as plain Markdown. Switch to **Source** at any time.
+- **Write in the rendered view.** Headings, lists, tables, code and front matter are edited in place, and saved as plain Markdown. Switch to **Source** at any time: the caret keeps its place in the text and on the screen.
 - **Edit Mermaid diagrams visually.** Flowcharts, architecture diagrams with groups, ER schemas and class diagrams. Click a node to rename it, change its shape or connect it. **Code** shows the Mermaid text.
 - **Review with an agent.** Select text, add a comment, press **Send to agent**. The agent runs `markline poll`, edits the file and runs `markline reply`. Each reply shows under its comment, and clicking the comment jumps to the changed text.
 - **Keep comments on track.** Comments are anchored to the quoted text, not to line numbers. If you rewrite the passage, the comment shows **Text changed** and points to the closest match.
@@ -71,6 +71,8 @@ sudo install -m755 src-tauri/target/release/markline /usr/local/bin/
 | Text size | `Ctrl` + `-` / `=` / `0`, `Ctrl` + wheel, or **Settings** |
 | Theme, fonts, line numbers, page width | **Settings** (gear icon, `Ctrl+,`) |
 | Undo, redo, history | arrow icons and the clock icon, or `Ctrl+Z` / `Ctrl+Shift+Z` |
+| Indent | `Tab` / `Shift+Tab`: nests list items, moves between table cells (the last cell adds a row), indents code and Source lines |
+| Full path of the file | under the file name; click it to copy |
 | Comment on a passage | select text, then `Ctrl+Alt+M` or click the Comment bubble |
 
 Comments are highlighted in Rendered view and listed in the side panel with line numbers. They are anchored to the quoted text, so they survive edits elsewhere. When the quoted text itself was rewritten, the comment shows **Text changed** and a line like `~L35`: clicking it selects the closest match, found from the text that stood around the quote.

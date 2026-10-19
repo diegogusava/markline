@@ -93,8 +93,8 @@ function loadMarkdown(md) {
   doc.querySelectorAll('figure.mm').forEach(initBlock);
   ensureParagraphs();
 }
-function docToMarkdown() {
-  const c = doc.cloneNode(true);
+function docToMarkdown(clone) {
+  const c = clone || doc.cloneNode(true);
   let head = '';
   const fmEl = doc.querySelector('figure.fm textarea');
   c.querySelectorAll('figure.fm').forEach(function (n) { n.remove(); });
@@ -110,11 +110,21 @@ function currentMarkdown() { return mode === 'source' ? srcEl.value : docToMarkd
 /* ---------- status ---------- */
 function updateStatus() {
   $('#fname').textContent = name;
+  const fp = $('#fpath'), path = fileHandle && fileHandle.native || '';
+  fp.hidden = !path;
+  // the marks keep slashes in order inside the right-to-left box that cuts the path at its start
+  fp.textContent = path ? '\u200E' + path + '\u200E' : '';
+  fp.title = path ? path + ' (click to copy)' : '';
   $('#dot').hidden = !dirty;
   $('#bSave').classList.toggle('primary', dirty);
   $('#bSave').textContent = dirty ? 'Save' : 'Saved';
   document.title = (dirty ? '● ' : '') + name + ' – Markline';
 }
+$('#fpath').addEventListener('click', function () {
+  const path = fileHandle && fileHandle.native;
+  if (!path) return;
+  navigator.clipboard.writeText(path).then(function () { toast('Copied the path.'); }, function () { toast(path); });
+});
 function toast(t) {
   const m = $('#msg');
   m.textContent = t;
@@ -855,6 +865,196 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
   }).catch(function () {});
 })();
 
+/* ---------- keeping the caret when switching views ----------
+   Two private-use characters stand in for the selection start and end. The document is converted with them in place,
+   their offsets are read, and the converted text without them is what the other view shows. */
+const MK_S = '\uE000', MK_E = '\uE001', MK_RE = /[\uE000\uE001]/g;
+function nodePath(n) {
+  const p = [];
+  while (n && n !== doc) {
+    const par = n.parentNode;
+    if (!par) return null;
+    p.unshift(Array.prototype.indexOf.call(par.childNodes, n));
+    n = par;
+  }
+  return n === doc ? p : null;
+}
+function nodeAt(root, p) {
+  let n = root;
+  for (let i = 0; i < p.length && n; i++) n = n.childNodes[p[i]];
+  return n || null;
+}
+// put marker mk into the copy at the place (node, off) of the live document; diagrams and raw HTML take it at the start of their text
+function putMark(copy, node, off, mk) {
+  const p = nodePath(node), cn = p && nodeAt(copy, p);
+  if (!cn) return;
+  const el = cn.nodeType === 1 ? cn : cn.parentElement, host = el && el.closest('figure.mm, div.raw');
+  if (host) host.setAttribute('data-src', mk + (host.getAttribute('data-src') || ''));
+  else if (cn.nodeType === 3) cn.insertData(Math.min(off, cn.data.length), mk);
+  else cn.insertBefore(document.createTextNode(mk), cn.childNodes[off] || null);
+}
+function rangeY(r) {
+  const rs = r.getClientRects();
+  if (rs.length && rs[0].height) return rs[0].top;
+  let n = r.startContainer;
+  if (n.nodeType === 3) n = n.parentElement;
+  if (n && n.nodeType === 1 && r.startOffset < n.childNodes.length && n.childNodes[r.startOffset].nodeType === 1) n = n.childNodes[r.startOffset];
+  return n && n.getBoundingClientRect ? n.getBoundingClientRect().top : null;
+}
+// the selection in Rendered view as offsets into the markdown, and how far down the screen it sits
+function renderedCaret(md) {
+  const ae = document.activeElement, fmT = doc.querySelector('figure.fm textarea');
+  if (fmT && ae === fmT) return { s: 4 + fmT.selectionStart, e: 4 + fmT.selectionEnd, y: fmT.getBoundingClientRect().top };
+  const sel = window.getSelection();
+  let r = null;
+  if (sel.rangeCount && doc.contains(sel.anchorNode)) r = sel.getRangeAt(0);
+  else if (saved && doc.contains(saved.startContainer)) r = saved;
+  if (!r) {
+    // no caret yet: the first block at the top of the screen
+    const top = $('#scroll').getBoundingClientRect().top;
+    const b = Array.from(doc.children).find(function (el) { return !el.matches('figure.fm') && el.getBoundingClientRect().bottom > top + 1; });
+    if (!b) return null;
+    r = document.createRange(); r.setStart(b, 0); r.collapse(true);
+  }
+  const c = doc.cloneNode(true);
+  putMark(c, r.endContainer, r.endOffset, MK_E);
+  putMark(c, r.startContainer, r.startOffset, MK_S);
+  const mk = docToMarkdown(c), head = fmT ? ('---\n' + fmT.value.replace(/\s+$/, '') + '\n---\n\n').length : 0;
+  function at(m) {
+    const i = mk.indexOf(m);
+    if (i < 0) return null;
+    const pre = mk.slice(0, i).replace(MK_RE, '').replace(/\n{3,}/g, '\n\n');
+    return pre.slice(head).trim() ? Math.min(pre.length, md.length) : head;
+  }
+  const s = at(MK_S);
+  if (s == null) return null;
+  const e = at(MK_E);
+  return { s: s, e: e == null || e < s ? s : e, y: rangeY(r) };
+}
+// where the line holding offset pos sits inside the Source textarea's text, measured on a copy that wraps the same way
+function srcLineTop(pos) {
+  const cs = getComputedStyle(srcEl), m = document.createElement('div');
+  ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'wordSpacing', 'tabSize', 'paddingLeft', 'paddingRight', 'paddingTop'].forEach(function (k) { m.style[k] = cs[k]; });
+  m.style.cssText += ';position:absolute;visibility:hidden;top:0;left:0;border:0;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:break-word;';
+  m.style.width = srcEl.clientWidth + 'px';
+  m.textContent = srcEl.value.slice(0, pos);
+  const sp = document.createElement('span');
+  sp.textContent = '\u200B';
+  m.appendChild(sp);
+  $('#srcwrap').appendChild(m);
+  const t = sp.offsetTop;
+  m.remove();
+  return t;
+}
+function srcZoom() { return srcEl.getBoundingClientRect().height / (srcEl.offsetHeight || 1) || 1; }
+// scroll the textarea so the line at pos shows at screen height y (or a third of the way down)
+function scrollSrcTo(pos, y) {
+  const rect = srcEl.getBoundingClientRect(), z = srcZoom();
+  const lh = parseFloat(getComputedStyle(srcEl).lineHeight) || 22;
+  let want = y == null ? srcEl.clientHeight / 3 : (y - rect.top) / z;
+  want = Math.max(0, Math.min(srcEl.clientHeight - 2 * lh, want));
+  srcEl.scrollTop = Math.max(0, srcLineTop(pos) - want);
+  numbers();
+}
+function sourceCaret() {
+  const s = srcEl.selectionStart, e = srcEl.selectionEnd, rect = srcEl.getBoundingClientRect();
+  let y = rect.top + (srcLineTop(s) - srcEl.scrollTop) * srcZoom();
+  if (y < rect.top || y > rect.bottom) y = null;
+  return { s: s, e: e, y: y };
+}
+// text characters of a block up to a marker (or the node and offset at a count), skipping diagrams, which draw their own labels
+function blockText(root) {
+  const out = [], w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: function (n) { return n.parentElement && n.parentElement.closest('figure.mm') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+  });
+  let n;
+  while ((n = w.nextNode())) out.push(n);
+  return out;
+}
+function pointAtCount(root, count) {
+  const ns = blockText(root);
+  for (let i = 0; i < ns.length; i++) {
+    if (count <= ns[i].data.length) return { node: ns[i], off: count };
+    count -= ns[i].data.length;
+  }
+  const last = ns[ns.length - 1];
+  return last ? { node: last, off: last.data.length } : { node: root, off: 0 };
+}
+// put the Rendered caret at the place of offsets c.s..c.e in markdown md, at screen height c.y
+function placeRenderedCaret(md, c) {
+  const sc = $('#scroll'), m = FM_RE.exec(md), fmLen = m ? m[0].length : 0;
+  function scrollTo(y) {
+    if (y == null) return;
+    const want = c.y == null ? sc.getBoundingClientRect().top + sc.clientHeight / 3 : c.y;
+    sc.scrollTop += y - want;
+  }
+  if (m && c.s < fmLen) {
+    const t = doc.querySelector('figure.fm textarea');
+    if (!t) return false;
+    const base = m[0].indexOf(m[1]), off = Math.max(0, Math.min(t.value.length, c.s - base));
+    t.focus({ preventScroll: true });
+    t.setSelectionRange(off, Math.max(off, Math.min(t.value.length, c.e - base)));
+    scrollTo(t.getBoundingClientRect().top);
+    return true;
+  }
+  const body = md.slice(fmLen), ps = Math.min(body.length, c.s - fmLen), pe = Math.max(ps, Math.min(body.length, c.e - fmLen));
+  const real = Array.from(doc.children).filter(function (el) { return !el.matches('figure.fm') && !(el.nodeName === 'P' && el.innerHTML === '<br>'); });
+  if (!real.length) return false;
+  function render(a, b) {
+    const t = body.slice(0, a) + MK_S + body.slice(a, b) + MK_E + body.slice(b);
+    return new DOMParser().parseFromString(sanitize(renderMarkdown(marked, t, MARKED_OPTS)), 'text/html').body;
+  }
+  // a marker inside markdown syntax (a fence, a table rule) can change the blocks; then try the end of the line, then its start
+  let tmp = render(ps, pe);
+  if (tmp.children.length !== real.length) {
+    const eol = body.indexOf('\n', ps), end = eol < 0 ? body.length : eol;
+    tmp = render(end, end);
+    if (tmp.children.length !== real.length) { const sol = body.lastIndexOf('\n', ps - 1) + 1; tmp = render(sol, sol); }
+  }
+  const blocks = Array.from(tmp.children);
+  function find(mk) {
+    const w = document.createTreeWalker(tmp, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      const i = n.data.indexOf(mk);
+      if (i < 0) continue;
+      let top = n.parentElement;
+      while (top && top.parentElement !== tmp) top = top.parentElement;
+      const rb = real[blocks.indexOf(top)];
+      if (!rb) return null;
+      let count = i;
+      const ns = blockText(top);
+      for (let k = 0; k < ns.length && ns[k] !== n; k++) count += ns[k].data.replace(MK_RE, '').length;
+      count -= (n.data.slice(0, i).match(MK_RE) || []).length;
+      return rb.matches('figure.mm, div.raw') ? { block: rb } : Object.assign({ block: rb }, pointAtCount(rb, count));
+    }
+    // inside an attribute: a diagram, raw HTML, a link address or an image
+    const el = Array.from(tmp.querySelectorAll('*')).find(function (x) { return Array.from(x.attributes).some(function (a) { return a.value.indexOf(mk) >= 0; }); });
+    if (!el) return null;
+    let top = el;
+    while (top.parentElement && top.parentElement !== tmp) top = top.parentElement;
+    const rb = real[blocks.indexOf(top)];
+    return rb ? { block: rb } : null;
+  }
+  let a = blocks.length === real.length ? find(MK_S) : null;
+  if (!a) {
+    // last resort: the block at the same share of the text
+    a = { block: real[Math.min(real.length - 1, Math.floor(ps / Math.max(1, body.length) * real.length))] };
+  }
+  const sel = window.getSelection();
+  if (!a.node) {
+    if (a.block.matches('figure.mm, div.raw')) { scrollTo(a.block.getBoundingClientRect().top); doc.focus({ preventScroll: true }); return true; }
+    Object.assign(a, pointAtCount(a.block, 0));
+  }
+  const b = pe > ps && blocks.length === real.length ? find(MK_E) : null;
+  doc.focus({ preventScroll: true });
+  try {
+    if (b && b.node) sel.setBaseAndExtent(a.node, a.off, b.node, b.off); else sel.collapse(a.node, a.off);
+  } catch (e) { return false; }
+  if (sel.rangeCount) scrollTo(rangeY(sel.getRangeAt(0)));
+  return true;
+}
+
 /* ---------- modes ---------- */
 function setModeUi() {
   $('#mR').classList.toggle('on', mode === 'rendered');
@@ -868,12 +1068,44 @@ function setModeUi() {
 }
 function setMode(next) {
   if (next === mode) return;
-  if (next === 'source') { histPush(); srcEl.value = docToMarkdown(); mode = 'source'; setModeUi(); numbers(); srcEl.focus(); }
-  else { const md = srcEl.value; mode = 'rendered'; setModeUi(); loadMarkdown(md); resolveImages(); if (window.reapplyChanges) window.reapplyChanges(); histPush(); doc.focus(); }
+  if (next === 'source') {
+    histPush();
+    const md = docToMarkdown();
+    let c = null;
+    try { c = renderedCaret(md); } catch (e) { c = null; }
+    srcEl.value = md; mode = 'source'; setModeUi(); numbers();
+    srcEl.focus({ preventScroll: true });
+    if (c) { srcEl.setSelectionRange(c.s, c.e); scrollSrcTo(c.s, c.y); }
+  } else {
+    const md = srcEl.value;
+    let c = null;
+    try { c = sourceCaret(); } catch (e) { c = null; }
+    mode = 'rendered'; setModeUi(); loadMarkdown(md); resolveImages(); if (window.reapplyChanges) window.reapplyChanges(); histPush();
+    let ok = false;
+    try { ok = !!c && placeRenderedCaret(md, c); } catch (e) { ok = false; }
+    if (!ok) doc.focus();
+  }
   updateCount();
 }
 $('#mR').addEventListener('click', function () { setMode('rendered'); });
 $('#mS').addEventListener('click', function () { setMode('source'); });
+// replace the selection in Source, through the browser's own editing when it can (that fires the input event)
+function srcInsert(t) {
+  if (!document.execCommand('insertText', false, t)) { srcEl.setRangeText(t, srcEl.selectionStart, srcEl.selectionEnd, 'end'); srcEl.dispatchEvent(new Event('input')); }
+}
+srcEl.addEventListener('keydown', function (e) {
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  e.preventDefault();
+  const v = srcEl.value, out = indentText(v, srcEl.selectionStart, srcEl.selectionEnd, e.shiftKey);
+  if (out.text === v) return;
+  // replace only the part that changed, so the textarea keeps its scroll position
+  let p = 0, q = 0;
+  while (p < v.length && v[p] === out.text[p]) p++;
+  while (q < v.length - p && q < out.text.length - p && v[v.length - 1 - q] === out.text[out.text.length - 1 - q]) q++;
+  srcEl.setSelectionRange(p, v.length - q);
+  srcInsert(out.text.slice(p, out.text.length - q));
+  srcEl.setSelectionRange(out.start, out.end);
+});
 srcEl.addEventListener('input', function (e) {
   markDirty();
   if (histPending && Date.now() - histStart > 1200 && (e.data === ' ' || e.inputType === 'insertLineBreak')) histPush();
@@ -1202,6 +1434,204 @@ function applyInline() {
   el.after(z);
   s.collapse(z, 1);
 }
+/* Typing right at the edge of inline code or a link writes outside it, so text added after `code` does not end up inside it.
+   Typing that goes on inside the element (you were already writing there) stays inside. */
+let typedIn = null, edgeBusy = false;
+function inlineAt(node) {
+  const el = node && (node.nodeType === 3 ? node.parentElement : node);
+  if (!el || !el.closest || !doc.contains(el)) return null;
+  const c = el.closest('a, code');
+  return c && doc.contains(c) && !c.closest('pre') ? c : null;
+}
+function onlyZw(t) { return !t.replace(/\u200B/g, ''); }
+// the inline code or link whose start or end the caret sits on, from inside or right beside it
+function edgeAt(node, off) {
+  let el0 = node.nodeType === 3 ? node.parentElement : node;
+  for (let el = el0 && el0.closest('a, code'); el && doc.contains(el); el = el.parentElement && el.parentElement.closest('a, code')) {
+    if (el.closest('pre') || onlyZw(el.textContent)) continue;
+    const r = document.createRange();
+    r.selectNodeContents(el); r.setStart(node, off);
+    if (onlyZw(r.toString())) return { el: outerEdge(el, true), after: true };
+    r.selectNodeContents(el); r.setEnd(node, off);
+    if (onlyZw(r.toString())) return { el: outerEdge(el, false), after: false };
+  }
+  // right beside it, outside: the browser may still put the text inside
+  let prev = null, next = null;
+  if (node.nodeType === 3) {
+    if (onlyZw(node.data.slice(0, off))) prev = node.previousSibling;
+    if (onlyZw(node.data.slice(off))) next = node.nextSibling;
+  } else {
+    prev = node.childNodes[off - 1] || null;
+    next = node.childNodes[off] || null;
+  }
+  if (prev && prev.nodeType === 1 && prev.matches('a, code') && !onlyZw(prev.textContent)) return { el: prev, after: true };
+  if (next && next.nodeType === 1 && next.matches('a, code') && !onlyZw(next.textContent)) return { el: next, after: false };
+  return null;
+}
+// `code` inside a link (or the other way round): leave both when the caret is on the edge of the outer one too
+function outerEdge(el, after) {
+  let up = el.parentElement;
+  while (up && up !== doc && up.matches('a, code') && (after ? up.lastChild === el : up.firstChild === el)) { el = up; up = el.parentElement; }
+  return el;
+}
+doc.addEventListener('beforeinput', function (e) {
+  if (edgeBusy || e.inputType !== 'insertText' || !e.data || e.defaultPrevented) return;
+  if (e.target !== doc && e.target.closest && e.target.closest('.mm,.fm')) return;
+  const s = window.getSelection();
+  if (!s.rangeCount || !s.isCollapsed || !doc.contains(s.anchorNode)) return;
+  const edge = edgeAt(s.anchorNode, s.anchorOffset);
+  if (!edge || edge.el === typedIn || edge.el.contains(typedIn)) return;
+  e.preventDefault();
+  // a zero-width space outside the element holds the caret there; it is dropped when the markdown is written
+  const el = edge.el, t = edge.after ? el.nextSibling : el.previousSibling;
+  if (t && t.nodeType === 3) {
+    if (edge.after) { t.insertData(0, '\u200B'); s.collapse(t, 1); } else { t.appendData('\u200B'); s.collapse(t, t.data.length); }
+  } else {
+    const z = document.createTextNode('\u200B');
+    el.parentNode.insertBefore(z, edge.after ? el.nextSibling : el);
+    s.collapse(z, 1);
+  }
+  edgeBusy = true;
+  try { document.execCommand('insertText', false, e.data); } finally { edgeBusy = false; }
+});
+doc.addEventListener('input', function () {
+  const s = window.getSelection();
+  typedIn = s.rangeCount ? inlineAt(s.anchorNode) : null;
+});
+doc.addEventListener('mousedown', function () { typedIn = null; });
+doc.addEventListener('keydown', function (e) {
+  if (/^(Arrow|Home|End|Page)/.test(e.key)) typedIn = null;
+});
+
+/* Tab: list items nest and come back out, table cells go to the next cell, code blocks get a tab, other text a visible gap */
+function textOffset(root, node, off) {
+  const r = document.createRange();
+  r.selectNodeContents(root); r.setEnd(node, off);
+  return r.toString().length;
+}
+// written into the text directly: the browser's insertText wraps a tab in a styled <span> and mixes no-break spaces with plain ones
+function insertRaw(text) {
+  const s = window.getSelection(), r = s.getRangeAt(0);
+  r.deleteContents();
+  let n = r.startContainer, off = r.startOffset;
+  if (n.nodeType !== 3) {
+    const t = document.createTextNode('');
+    n.insertBefore(t, n.childNodes[off] || null);
+    n = t; off = 0;
+  }
+  n.insertData(off, text);
+  s.collapse(n, off + text.length);
+}
+function tabInCode(pre, outdent) {
+  const s = window.getSelection(), code = pre.querySelector('code') || pre;
+  if (s.isCollapsed && !outdent) { insertRaw('\t'); return true; }
+  if (!code.textContent) return false;
+  // line breaks typed as <br> become newlines, so the code is plain text that can be indented line by line
+  code.querySelectorAll('br').forEach(function (b) { b.replaceWith('\n'); });
+  const r = s.getRangeAt(0);
+  if (!code.contains(r.startContainer) || !code.contains(r.endContainer)) return false;
+  const text = code.textContent, out = indentText(text, textOffset(code, r.startContainer, r.startOffset), textOffset(code, r.endContainer, r.endOffset), outdent);
+  if (out.text === text) return false;
+  code.textContent = out.text;
+  const a = pointAtCount(code, out.start), b = pointAtCount(code, out.end);
+  s.setBaseAndExtent(a.node, a.off, b.node, b.off);
+  return true;
+}
+function tabInCell(cell, outdent) {
+  const table = cell.closest('table'), cells = Array.from(table.querySelectorAll('th,td'));
+  const i = cells.indexOf(cell) + (outdent ? -1 : 1);
+  if (i < 0) return false;
+  let target = cells[i], added = false;
+  if (!target) {
+    // Tab in the last cell adds a row, as in word processors
+    const tr = document.createElement('tr');
+    Array.from(cell.parentElement.children).forEach(function () { const td = document.createElement('td'); td.innerHTML = '<br>'; tr.appendChild(td); });
+    let body = table.tBodies[0];
+    if (!body) { body = document.createElement('tbody'); table.appendChild(body); }
+    body.appendChild(tr);
+    target = tr.firstChild; added = true;
+  }
+  const r = document.createRange();
+  r.selectNodeContents(target); r.collapse(false);
+  const s = window.getSelection();
+  s.removeAllRanges(); s.addRange(r);
+  return added;
+}
+function indentItem(li) {
+  const prev = li.previousElementSibling;
+  if (!prev || prev.nodeName !== 'LI') return false;
+  let sub = prev.lastElementChild;
+  if (!sub || !/^(UL|OL)$/.test(sub.nodeName)) { sub = document.createElement(li.parentElement.nodeName); prev.appendChild(sub); }
+  sub.appendChild(li);
+  return true;
+}
+function outdentItem(li) {
+  const list = li.parentElement, up = list.parentElement;
+  if (!up || up.nodeName !== 'LI') return false;
+  // the items below it stay below it, now nested inside it
+  const rest = [];
+  for (let n = li.nextElementSibling; n; n = n.nextElementSibling) rest.push(n);
+  if (rest.length) {
+    let sub = li.lastElementChild;
+    if (!sub || !/^(UL|OL)$/.test(sub.nodeName)) { sub = document.createElement(list.nodeName); li.appendChild(sub); }
+    rest.forEach(function (n) { sub.appendChild(n); });
+  }
+  up.after(li);
+  if (!list.children.length) list.remove();
+  return true;
+}
+function tabInList(li, outdent) {
+  const s = window.getSelection(), r = s.getRangeAt(0), keep = [s.anchorNode, s.anchorOffset, s.focusNode, s.focusOffset];
+  const items = Array.from(li.parentElement.children).filter(function (x) { return x.nodeName === 'LI' && (x === li || r.intersectsNode(x)); });
+  let changed = false;
+  for (let i = 0; i < items.length; i++) {
+    const ok = outdent ? outdentItem(items[i]) : indentItem(items[i]);
+    if (!ok) break;
+    changed = true;
+  }
+  try { s.setBaseAndExtent(keep[0], keep[1], keep[2], keep[3]); } catch (e) { /* keep what the browser chose */ }
+  return changed;
+}
+// returns true when the document changed
+function tabKey(outdent) {
+  const s = window.getSelection();
+  if (!s.rangeCount || !doc.contains(s.anchorNode)) return false;
+  const el = s.anchorNode.nodeType === 3 ? s.anchorNode.parentElement : s.anchorNode;
+  if (!el || !el.closest) return false;
+  const pre = el.closest('pre'), cell = el.closest('td,th'), li = el.closest('li');
+  if (pre && doc.contains(pre)) return tabInCode(pre, outdent);
+  if (cell && doc.contains(cell)) return tabInCell(cell, outdent);
+  if (li && doc.contains(li)) return tabInList(li, outdent);
+  const n = s.anchorNode;
+  if (outdent) {
+    // Shift+Tab takes back a gap typed right before the caret
+    if (!s.isCollapsed || n.nodeType !== 3) return false;
+    const m = /[\u00A0 ]{1,4}$/.exec(n.data.slice(0, s.anchorOffset));
+    if (!m || m[0].indexOf('\u00A0') < 0) return false;
+    const at = s.anchorOffset - m[0].length;
+    n.deleteData(at, m[0].length);
+    s.collapse(n, at);
+    return true;
+  }
+  // markdown drops tabs and runs of spaces in a paragraph, so the gap is made of no-break spaces
+  insertRaw('\u00A0\u00A0\u00A0\u00A0');
+  return true;
+}
+doc.addEventListener('keydown', function (e) {
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  const t = e.target;
+  if (t !== doc && t.closest && t.closest('.mm')) return;
+  if (t !== doc && t.matches && t.matches('figure.fm textarea')) {
+    // YAML does not allow tabs
+    if (!e.shiftKey) { e.preventDefault(); document.execCommand('insertText', false, '  '); }
+    return;
+  }
+  e.preventDefault();
+  histPush();
+  const bc = readCaret() || idleCaret;
+  if (tabKey(e.shiftKey)) { pendingBeforeCaret = bc; markDirty(); histPush(); }
+  updateToolState();
+});
 doc.addEventListener('keydown', function (e) {
   if (e.target !== doc && e.target.closest && e.target.closest('.mm')) return;
   if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
