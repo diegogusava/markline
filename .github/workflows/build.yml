@@ -72,11 +72,15 @@ jobs:
       - name: Publish v${{ env.VERSION }}
         run: |
           tag="v$VERSION"
+          # The artifacts keep their bundle folders (deb/, appimage/, nsis/, msi/), so collect the files inside them.
+          mapfile -t files < <(find out -type f)
+          printf '%s\n' "${files[@]}"
           if gh release view "$tag" >/dev/null 2>&1; then
-            # A re-run of this workflow: replace the files on the same release.
-            gh release upload "$tag" out/* --clobber
+            # A re-run, or a publish that failed half way and left a draft: replace its files and publish it.
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --draft=false --latest
           else
-            gh release create "$tag" out/* \
+            gh release create "$tag" "${files[@]}" \
               --target "$GITHUB_SHA" \
               --title "Markline $VERSION" \
               --generate-notes \
