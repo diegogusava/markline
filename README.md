@@ -26,7 +26,7 @@ A Markdown editor for people who review documents with a coding agent. You write
 
 ### Prebuilt
 
-Every push to `main` is built by GitHub Actions for Linux and Windows and attached to the [`latest` release](https://github.com/diegogusava/markline/releases/tag/latest). The repo is private, so sign in to GitHub first.
+Every push to `main` is built by GitHub Actions for Linux and Windows and published as its own tagged release (`v0.1.N`). The [latest release](https://github.com/diegogusava/markline/releases/latest) always points to the newest build; older versions stay under [Releases](https://github.com/diegogusava/markline/releases). The repo is private, so sign in to GitHub first.
 
 | Platform | Asset |
 |----------|-------|
