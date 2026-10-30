@@ -123,6 +123,43 @@ document.addEventListener('keydown', function (e) {
   else if (e.key === 'Escape' && document.activeElement === ta) { e.preventDefault(); flush(); ta.blur(); }
 });
 
+/* ---------- width: drag the left edge, arrow keys on it, double-click to reset ---------- */
+const grip = $('#nGrip'), WIDTH_KEY = 'markline-notes-width-v1', MIN_W = 240;
+let cur = null;
+function maxW() { return Math.max(MIN_W, Math.min(900, window.innerWidth * 0.7)); }
+function setWidth(w, save) {
+  cur = w == null ? null : Math.round(Math.min(maxW(), Math.max(MIN_W, w)));
+  if (cur == null) panel.style.removeProperty('--nw'); else panel.style.setProperty('--nw', cur + 'px');
+  if (save) saved = cur;
+  if (save) try { if (cur == null) localStorage.removeItem(WIDTH_KEY); else localStorage.setItem(WIDTH_KEY, String(cur)); } catch (e) { /* ignore */ }
+}
+// the panel is zoomed with the UI, so screen pixels are divided by the zoom to get CSS pixels
+function uiZoom() { return panel.getBoundingClientRect().width / (panel.offsetWidth || 1) || 1; }
+grip.addEventListener('pointerdown', function (e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  grip.setPointerCapture(e.pointerId);
+  grip.classList.add('drag'); document.body.classList.add('resizing');
+  const right = panel.getBoundingClientRect().right, z = uiZoom();
+  function move(ev) { setWidth((right - ev.clientX) / z, false); }
+  function up() {
+    grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', up);
+    grip.classList.remove('drag'); document.body.classList.remove('resizing');
+    setWidth(panel.offsetWidth, true);
+  }
+  grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', up);
+});
+grip.addEventListener('dblclick', function () { setWidth(null, true); });
+grip.addEventListener('keydown', function (e) {
+  const step = e.shiftKey ? 60 : 20;
+  if (e.key === 'ArrowLeft') { e.preventDefault(); setWidth(panel.offsetWidth + step, true); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); setWidth(panel.offsetWidth - step, true); }
+});
+// a smaller window narrows the panel to fit; the saved width comes back when there is room again
+let saved = null;
+window.addEventListener('resize', function () { if (saved != null) setWidth(saved, false); });
+try { const w = parseInt(localStorage.getItem(WIDTH_KEY), 10); if (w) { saved = w; setWidth(w, false); } } catch (e) { /* ignore */ }
+
 target = targetNow(); updateWhere(); load(false);
 try { if (localStorage.getItem(OPEN_KEY) && !narrow()) showPanel(true, false); } catch (e) { /* ignore */ }
 window.__marklineNotes = { get: function () { return ta.value; }, target: function () { return target; }, flush: flush };

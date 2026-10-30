@@ -54,8 +54,10 @@ fn notes_of(p: &Path) -> Option<std::path::PathBuf> {
 struct Entry { name: String, path: String, is_dir: bool }
 
 #[tauri::command]
-async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    match app.dialog().file().blocking_pick_folder() {
+async fn pick_folder(app: tauri::AppHandle, start: Option<String>) -> Result<Option<String>, String> {
+    let mut dlg = app.dialog().file();
+    if let Some(d) = start.filter(|d| Path::new(d).is_dir()) { dlg = dlg.set_directory(d); }
+    match dlg.blocking_pick_folder() {
         Some(fp) => Ok(Some(fp.into_path().map_err(|e| e.to_string())?.to_string_lossy().into_owned())),
         None => Ok(None),
     }

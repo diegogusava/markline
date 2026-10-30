@@ -732,11 +732,35 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
   function base(p) { return p.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p; }
+  function dirOf(p) { return p.replace(/[\\/][^\\/]*$/, '') || p; }
+  // compares paths the way the OS spells them: either separator, Windows' \\?\ prefix, any case on Windows
+  function norm(p) { p = p.replace(/^\\\\\?\\/, '').replace(/\\/g, '/').replace(/\/+$/, ''); return /^[a-z]:/i.test(p) ? p.toLowerCase() : p; }
+  // the folders between the panel's folder and the file, outermost first; null when the file is outside it
+  function between(file, dir) {
+    const f = norm(file), d = norm(dir);
+    if (f.indexOf(d + '/') !== 0) return null;
+    // spelled the way list_dir spells the tree's rows: the panel's folder joined with its own separator
+    const sep = dir.indexOf('\\') >= 0 ? '\\' : '/', segs = f.slice(d.length + 1).split('/').slice(0, -1), out = [];
+    let at = dir.replace(/[\\/]+$/, '');
+    segs.forEach(function (x) { at += sep + x; out.push(at); });
+    return out;
+  }
+  // the panel shows the folder of the open file: its own folder when it is outside the panel's folder,
+  // otherwise the panel's folder with the folders down to the file expanded. Returns true when the tree must redraw.
+  function followFile() {
+    const cp = curPath();
+    if (!cp) return false;
+    const sub = root ? between(cp, root) : null;
+    if (!sub) { root = dirOf(cp); open.clear(); lsSet(RKEY, root); return true; }
+    const add = sub.filter(function (d) { return !open.has(d); });
+    add.forEach(function (d) { open.add(d); });
+    return add.length > 0;
+  }
   function showPanel(on) {
     side.hidden = !on;
     syncRail();
     lsSet(OKEY, on ? '1' : '0');
-    if (on && tab === 'files' && !root) pickFolder();
+    if (on && tab === 'files') { if (followFile()) render(); else if (!root) pickFolder(); }
     drawOutline();
   }
   function curPath() { return fileHandle && fileHandle.native || null; }
@@ -744,9 +768,13 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
     const cp = curPath();
     tree.querySelectorAll('.row.active').forEach(function (n) { n.classList.remove('active'); });
     if (!cp) return;
-    tree.querySelectorAll('.row[data-path]').forEach(function (n) { if (n.dataset.path === cp) n.classList.add('active'); });
+    const want = norm(cp);
+    tree.querySelectorAll('.row[data-path]').forEach(function (n) { if (norm(n.dataset.path) === want) n.classList.add('active'); });
   }
-  window.syncActive = syncActive;
+  // called after a file is opened or saved: an open Files panel moves to that file's folder
+  window.syncActive = function () {
+    if (!side.hidden && tab === 'files' && followFile()) render(); else syncActive();
+  };
   async function fill(ul, path) {
     ul.innerHTML = '';
     let items;
@@ -773,7 +801,7 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
         });
       } else {
         row.addEventListener('click', function () {
-          if (it.path === curPath()) return;
+          if (curPath() && norm(it.path) === norm(curPath())) return;
           leave(async function () {
             try { const f = await TAURI.invoke('read_file', { path: it.path }); loadDoc(f.text, f.name, { native: f.path }); }
             catch (e) { toast('Could not open ' + it.name); }
@@ -794,7 +822,8 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
     syncActive();
   }
   async function pickFolder() {
-    const p = await TAURI.invoke('pick_folder');
+    const cp = curPath();
+    const p = await TAURI.invoke('pick_folder', { start: root || (cp ? dirOf(cp) : null) });
     if (!p) return;
     root = p; open.clear(); lsSet(RKEY, p);
     render();

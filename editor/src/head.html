@@ -329,14 +329,18 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
 #cfab { position: fixed; z-index: 20; font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 @media (max-width: 700px) { #cpanel { position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
 /* notes */
-#npanel { width: min(340px, 100%); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
+#npanel { position: relative; width: var(--nw, min(340px, 100%)); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
 #npanel .cbody { overflow: hidden; }
 #nText { flex: 1; min-height: 0; width: 100%; resize: none; font: inherit; font-size: 14px; line-height: 1.55; color: var(--fg); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px 12px; outline: none; }
 #nText:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 #nWhere { text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 .ndot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
 .ndot[hidden] { display: none; }
-@media (max-width: 700px) { #npanel { position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
+.ngrip { position: absolute; left: -3px; top: 0; bottom: 0; width: 7px; cursor: col-resize; z-index: 2; touch-action: none; }
+.ngrip:hover, .ngrip:focus-visible, .ngrip.drag { background: var(--accent-soft); outline: none; }
+body.resizing { cursor: col-resize; user-select: none; }
+@media (max-width: 700px) { .ngrip { display: none; } }
+@media (max-width: 700px) { #npanel { width: min(340px, 100%); position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
 #shFolder { text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 .shrow { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .shrow input[type=number] { width: 90px; font: inherit; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--fg); }
@@ -508,6 +512,7 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
       </div>
     </aside>
     <aside id="npanel" hidden aria-label="Notes">
+      <div class="ngrip" id="nGrip" role="separator" aria-orientation="vertical" aria-label="Resize notes" tabindex="0" title="Drag to resize. Double-click to reset."></div>
       <div class="side-head">
         <span class="side-name">Notes <span id="nState" class="cbadge"></span></span>
         <button type="button" class="btn sm" id="nClose" title="Hide panel" aria-label="Hide notes">&times;</button>
