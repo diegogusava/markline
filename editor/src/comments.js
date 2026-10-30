@@ -62,11 +62,15 @@ function docRanges() {
 function refreshHighlights() {
   ranges = docRanges();
   if (!HL) return;
-  CSS.highlights.delete('ml-c'); CSS.highlights.delete('ml-ca');
-  const all = [], act = [];
-  const live = new Set(comments.filter(function (c) { return c.status === 'open' || c.status === 'sent'; }).map(function (c) { return c.id; }));
-  ranges.forEach(function (r, id) { if (id === activeId) act.push(r); else if (live.has(id)) all.push(r); });
+  CSS.highlights.delete('ml-c'); CSS.highlights.delete('ml-cd'); CSS.highlights.delete('ml-ca');
+  // open and sent comments in yellow, ones the agent applied in green, resolved ones only while selected
+  const all = [], done = [], act = [], status = new Map(comments.map(function (c) { return [c.id, c.status]; }));
+  ranges.forEach(function (r, id) {
+    const s = status.get(id);
+    if (id === activeId) act.push(r); else if (s === 'open' || s === 'sent') all.push(r); else if (s === 'applied') done.push(r);
+  });
   if (all.length) CSS.highlights.set('ml-c', new Highlight(...all));
+  if (done.length) CSS.highlights.set('ml-cd', new Highlight(...done));
   if (act.length) CSS.highlights.set('ml-ca', new Highlight(...act));
 }
 function scheduleHl() { clearTimeout(hlTimer); hlTimer = setTimeout(refreshHighlights, 250); clearTimeout(listTimer); listTimer = setTimeout(function () { if (!panel.hidden) renderList(); }, 900); }
