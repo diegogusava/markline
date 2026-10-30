@@ -131,6 +131,9 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); fon
 .dmenu-list button:hover, .dmenu-list button:focus-visible { background: var(--accent-soft); outline: none; }
 .dmenu-list b { font-weight: 600; font-size: 13px; }
 .dmenu-list small { color: var(--muted); font-size: 12px; }
+.dmenu-list button:disabled { opacity: .4; cursor: default; background: none; }
+.dmenu-list button.danger { color: var(--danger, #c0392b); }
+.dmenu-list hr { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; }
 #confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--accent-soft); border-block: 1px solid var(--border); padding-block: 6px; font-size: 13px; }
 
 /* document */
@@ -445,6 +448,19 @@ body.resizing { cursor: col-resize; user-select: none; }
       <button type="button" class="btn tool icon" data-tool="ol" title="Numbered list" aria-label="Numbered list"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-ol"/></svg></button>
       <button type="button" class="btn tool icon" data-tool="quote" title="Quote" aria-label="Quote"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-quote"/></svg></button>
       <button type="button" class="btn tool icon" data-tool="table" title="Table" aria-label="Table"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-table"/></svg></button>
+      <details class="dmenu" id="tmenu" hidden>
+        <summary class="btn tool" title="Rows and columns"><span>Rows &amp; columns</span><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-chev"/></svg></summary>
+        <div class="dmenu-list">
+          <button type="button" data-tool="t:rowAbove"><b>Insert row above</b></button>
+          <button type="button" data-tool="t:rowBelow"><b>Insert row below</b></button>
+          <button type="button" data-tool="t:colLeft"><b>Insert column left</b></button>
+          <button type="button" data-tool="t:colRight"><b>Insert column right</b></button>
+          <hr>
+          <button type="button" data-tool="t:delRow"><b>Delete row</b></button>
+          <button type="button" data-tool="t:delCol"><b>Delete column</b></button>
+          <button type="button" data-tool="t:delTable" class="danger"><b>Delete table</b></button>
+        </div>
+      </details>
       <span class="sep"></span>
       <details class="dmenu" id="dmenu">
         <summary class="btn tool" title="Insert a diagram"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-diag"/></svg><span>Diagram</span><svg class="ic" width="13" height="13" aria-hidden="true"><use href="#i-chev"/></svg></summary>

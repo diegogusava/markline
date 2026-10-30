@@ -1375,6 +1375,18 @@ function runTool(t) {
   focusDoc();
   const bc = readCaret() || idleCaret;
   if (t.indexOf('d:') === 0) { insertDiagram(t.slice(2)); pendingBeforeCaret = bc; markDirty(); histPush(); return; }
+  if (t.indexOf('t:') === 0) {
+    const cell = curCell();
+    if (!cell || !tableCanDo(cell, t.slice(2))) return;
+    const table = cell.closest('table'), near = table.nextElementSibling || table.previousElementSibling;
+    const next = tableOp(cell, t.slice(2)), sel = window.getSelection(), r = document.createRange();
+    ensureParagraphs();
+    // a removed table leaves the caret in the block that took its place
+    const to = next || (near && doc.contains(near) ? near : doc.lastElementChild);
+    r.selectNodeContents(to); r.collapse(!next);
+    sel.removeAllRanges(); sel.addRange(r);
+    pendingBeforeCaret = bc; markDirty(); histPush(); updateToolState(); return;
+  }
   switch (t) {
     case 'h1': case 'h2': case 'h3': toggleBlock(t); break;
     case 'bold': document.execCommand('bold'); break;
@@ -1389,6 +1401,13 @@ function runTool(t) {
   markDirty();
   histPush();
   updateToolState();
+}
+function curCell() {
+  const s = window.getSelection();
+  let n = s.rangeCount ? s.anchorNode : null;
+  if (n && n.nodeType === 3) n = n.parentElement;
+  const c = n && n.closest ? n.closest('td,th') : null;
+  return c && doc.contains(c) && !c.closest('.mm,div.raw') ? c : null;
 }
 function updateToolState() {
   const s = window.getSelection();
@@ -1412,6 +1431,10 @@ function updateToolState() {
     on.code = coveredBy('code', 'pre') || !!up(a, 'pre');
     on.table = !!up(a, 'table');
   }
+  const cell = curCell(), tm = $('#tmenu');
+  tm.hidden = !cell;
+  if (!cell) tm.open = false;
+  else tm.querySelectorAll('[data-tool]').forEach(function (b) { b.disabled = !tableCanDo(cell, b.dataset.tool.slice(2)); });
   document.querySelectorAll('#tools [data-tool]').forEach(function (b) {
     const v = !!on[b.dataset.tool];
     b.classList.toggle('on', v);
@@ -1425,9 +1448,13 @@ $('#tools').addEventListener('click', function (e) {
   const b = e.target.closest('[data-tool]');
   if (!b) return;
   $('#dmenu').open = false;
+  $('#tmenu').open = false;
   runTool(b.dataset.tool);
 });
-document.addEventListener('click', function (e) { if (!e.target.closest('#dmenu')) $('#dmenu').open = false; });
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('#dmenu')) $('#dmenu').open = false;
+  if (!e.target.closest('#tmenu')) $('#tmenu').open = false;
+});
 
 /* markdown shortcuts while typing */
 function spaceShortcut() {

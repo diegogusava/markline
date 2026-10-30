@@ -3,7 +3,7 @@ const fs = require('fs');
 const here = __dirname + '/';
 const src = here + 'editor/src/';
 const rd = f => fs.readFileSync(src + f, 'utf8');
-const js = ['common.js', 'flow.js', 'er.js', 'cls.js', 'blocks.js', 'markdown.js', 'indent.js', 'rest.js', 'anchor.js', 'comments.js', 'notes.js', 'share.js'].map(rd).join('\n');
+const js = ['common.js', 'flow.js', 'er.js', 'cls.js', 'blocks.js', 'markdown.js', 'table.js', 'indent.js', 'rest.js', 'anchor.js', 'comments.js', 'notes.js', 'share.js'].map(rd).join('\n');
 let h = rd('head.html') + "<script>\n(function () {\n'use strict';\n" + js + "\n})();\n</script>\n</body>\n</html>\n";
 const map = {
   'https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js': ['marked/marked.min.js', 'vendor/marked.min.js'],
