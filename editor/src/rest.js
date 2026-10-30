@@ -480,10 +480,61 @@ function resolveImages() {
 }
 let diskText = '', cleanMd = null;
 function markClean() { dirty = false; cleanMd = currentMarkdown(); updateStatus(); saveDraft(); }
-const scrollPos = {};
+/* ---------- where you were in each file ----------
+   The caret (as offsets into the markdown), its height on screen, the view and the scroll position are kept per file path,
+   so reopening a file, also after a restart, puts you back where you left it. */
+const POS_KEY = 'markline-caret-v1', POS_MAX = 200;
+let posTimer = null, restoring = false;
+function posAll() { try { return JSON.parse(localStorage.getItem(POS_KEY) || '{}') || {}; } catch (e) { return {}; } }
+function rememberCaret() {
+  clearTimeout(posTimer); posTimer = null;
+  const p = fileHandle && fileHandle.native;
+  if (!p || restoring) return;
+  const sc = mode === 'source' ? srcEl : $('#scroll');
+  let c = null;
+  try {
+    if (mode === 'source') c = sourceCaret();
+    else {
+      const sel = window.getSelection();
+      if ((sel.rangeCount && doc.contains(sel.anchorNode)) || (saved && doc.contains(saved.startContainer))) c = renderedCaret(docToMarkdown());
+    }
+  } catch (e) { c = null; }
+  const top = sc.getBoundingClientRect().top, all = posAll();
+  all[p] = { m: mode, s: c ? c.s : null, e: c ? c.e : null, y: c && c.y != null ? Math.round(c.y - top) : null, t: Math.round(sc.scrollTop), at: Date.now() };
+  const keys = Object.keys(all);
+  if (keys.length > POS_MAX) keys.sort(function (a, b) { return all[a].at - all[b].at; }).slice(0, keys.length - POS_MAX).forEach(function (k) { delete all[k]; });
+  try { localStorage.setItem(POS_KEY, JSON.stringify(all)); } catch (e) { /* storage full or unavailable */ }
+}
+function rememberSoon() { if (!restoring && fileHandle && fileHandle.native) { clearTimeout(posTimer); posTimer = setTimeout(rememberCaret, 800); } }
+// true when a position was put back
+function restoreCaret(p) {
+  const r = p && posAll()[p];
+  if (!r) return false;
+  restoring = true;
+  try {
+    if (r.m === 'source') {
+      setMode('source');
+      if (r.s != null) { srcEl.setSelectionRange(r.s, r.e); scrollSrcTo(r.s, r.y == null ? null : srcEl.getBoundingClientRect().top + r.y); }
+      else srcEl.scrollTop = r.t;
+      numbers();
+    } else {
+      const sc = $('#scroll');
+      let ok = false;
+      if (r.s != null) { try { ok = placeRenderedCaret(docToMarkdown(), { s: r.s, e: r.e, y: r.y == null ? null : sc.getBoundingClientRect().top + r.y }); } catch (e) { ok = false; } }
+      if (!ok) sc.scrollTop = r.t;
+    }
+  } finally { restoring = false; }
+  return true;
+}
+document.addEventListener('selectionchange', rememberSoon);
+$('#scroll').addEventListener('scroll', rememberSoon, { passive: true });
+srcEl.addEventListener('scroll', rememberSoon, { passive: true });
+window.addEventListener('beforeunload', rememberCaret);
+document.addEventListener('visibilitychange', function () { if (document.hidden) rememberCaret(); });
+
 function loadDoc(text, fname, handle) {
-  const sc = $('#scroll'), was = fileHandle && fileHandle.native;
-  if (was) scrollPos[was] = sc.scrollTop;
+  const sc = $('#scroll');
+  rememberCaret();
   mode = 'rendered';
   setModeUi();
   name = fname || 'untitled.md';
@@ -496,9 +547,11 @@ function loadDoc(text, fname, handle) {
   updateCount();
   if (window.syncActive) window.syncActive();
   if (window.onDocLoaded) window.onDocLoaded();
-  const top = handle && handle.native && scrollPos[handle.native] || 0;
-  sc.scrollTop = top;
-  requestAnimationFrame(function () { sc.scrollTop = top; });
+  sc.scrollTop = 0;
+  const p = handle && handle.native;
+  restoreCaret(p);
+  // diagrams and images take their size a moment later, which moves the text; place it again once they have
+  requestAnimationFrame(function () { if (fileHandle && fileHandle.native === p) restoreCaret(p); });
 }
 const TAURI = window.__TAURI__ && window.__TAURI__.core ? window.__TAURI__.core : null;
 const io = {
