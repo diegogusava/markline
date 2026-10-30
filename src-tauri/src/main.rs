@@ -14,7 +14,7 @@ fn file_name(p: &Path) -> String {
     p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "untitled.md".into())
 }
 fn read(p: &Path) -> Result<Opened, String> {
-    let p = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let p = web::real_path(p).unwrap_or_else(|_| p.to_path_buf());
     let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
     Ok(Opened { path: p.to_string_lossy().into_owned(), name: file_name(&p), text })
 }
@@ -147,7 +147,7 @@ fn open_url(url: String) -> Result<(), String> {
 fn initial_arg() -> Option<std::path::PathBuf> {
     let arg = std::env::args().skip(1).find(|a| !a.starts_with('-'))?;
     let p = Path::new(&arg);
-    Some(p.canonicalize().unwrap_or_else(|_| p.to_path_buf()))
+    Some(web::real_path(p).unwrap_or_else(|_| p.to_path_buf()))
 }
 
 #[tauri::command]

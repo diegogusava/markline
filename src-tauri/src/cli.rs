@@ -105,7 +105,7 @@ fn serve(a: &Args) -> i32 {
 
 fn open(a: &Args) -> i32 {
     let arg = match a.pos.first() { Some(p) => p, None => return err("Usage: markline open FILE.md") };
-    let file = match Path::new(arg).canonicalize() { Ok(f) => f, Err(e) => return err(&format!("{}: {}", arg, e)) };
+    let file = match web::real_path(Path::new(arg)) { Ok(f) => f, Err(e) => return err(&format!("{}: {}", arg, e)) };
     let mut st = alive();
     if let Some(s) = &st {
         if !file.starts_with(&s.root) { return err(&format!("The running server only serves {}, which does not contain {}. Stop it (markline stop) or open a file inside that folder.", s.root.display(), file.display())); }
@@ -143,7 +143,7 @@ fn open(a: &Args) -> i32 {
 
 /// Desktop "Send to agent": queue the file's open comments on the server `poll` waits on, starting one in the file's folder if none runs.
 pub fn send(w: &Web, path: &str) -> Result<Value, String> {
-    let file = Path::new(path).canonicalize().map_err(|e| format!("{}: {}", path, e))?;
+    let file = web::real_path(Path::new(path)).map_err(|e| format!("{}: {}", path, e))?;
     let s = match alive() {
         Some(s) => s,
         None => {
@@ -159,7 +159,7 @@ fn poll(a: &Args) -> i32 {
     let s = match need_server() { Ok(s) => s, Err(c) => return c };
     let secs: u64 = a.flags.get("timeout").and_then(|t| t.parse().ok()).unwrap_or(600);
     let end = Instant::now() + Duration::from_secs(secs);
-    let fq = a.flags.get("file").and_then(|f| Path::new(f).canonicalize().ok()).map(|p| format!("&file={}", p.to_string_lossy().bytes().map(|c| if c.is_ascii_alphanumeric() || b"-_.~/".contains(&c) { (c as char).to_string() } else { format!("%{:02X}", c) }).collect::<String>())).unwrap_or_default();
+    let fq = a.flags.get("file").and_then(|f| web::real_path(Path::new(f)).ok()).map(|p| format!("&file={}", p.to_string_lossy().bytes().map(|c| if c.is_ascii_alphanumeric() || b"-_.~/".contains(&c) { (c as char).to_string() } else { format!("%{:02X}", c) }).collect::<String>())).unwrap_or_default();
     let mut batch = Value::Null;
     while batch.is_null() && Instant::now() < end {
         let chunk = (end - Instant::now()).as_secs().clamp(1, 10);
@@ -192,7 +192,7 @@ fn reply(a: &Args) -> i32 {
     let text = a.pos.join(" ");
     let resolved = a.flags.contains_key("resolved");
     if text.is_empty() && !resolved { return err("Usage: markline reply [--batch ID] [--file F] [--comment ID --lines A-B] [--resolved] \"what you changed\""); }
-    let file = a.flags.get("file").and_then(|f| Path::new(f).canonicalize().ok()).map(|p| p.to_string_lossy().into_owned());
+    let file = a.flags.get("file").and_then(|f| web::real_path(Path::new(f)).ok()).map(|p| p.to_string_lossy().into_owned());
     let body = json!({"batch": a.flags.get("batch"), "file": file, "comment": a.flags.get("comment"), "lines": a.flags.get("lines"), "text": text, "status": if resolved { "resolved" } else { "applied" }});
     match http(&s, "POST", "/api/reply", Some(&body), Duration::from_secs(10)) {
         Ok(v) => { println!("Replied; {} comment(s) marked {}.", v["result"]["updated"], if resolved { "resolved" } else { "applied" }); 0 }

@@ -140,15 +140,29 @@ fn mtime(p: &Path) -> f64 {
     std::fs::metadata(p).and_then(|m| m.modified()).ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_secs_f64() * 1000.0).unwrap_or(0.0)
 }
+/// `canonicalize`, but without the `\\?\` prefix it adds on Windows, so paths read the way people write them
+/// (C:\Users\..., not \\?\C:\Users\...). Every resolved path goes through here, so `starts_with` checks
+/// compare like with like. The prefix stays on paths that need it: longer than Windows' 260-character limit.
+pub fn real_path(p: &Path) -> std::io::Result<PathBuf> {
+    let r = p.canonicalize()?;
+    if !cfg!(windows) { return Ok(r); }
+    Ok(match plain_windows(&r.to_string_lossy()) { Some(s) => PathBuf::from(s), None => r })
+}
+/// `\\?\C:\x` -> `C:\x` and `\\?\UNC\srv\share` -> `\\srv\share`; None when there is no prefix or it is needed
+fn plain_windows(s: &str) -> Option<String> {
+    let plain = if let Some(unc) = s.strip_prefix(r"\\?\UNC\") { format!(r"\\{}", unc) }
+        else { let disk = s.strip_prefix(r"\\?\")?; if disk.as_bytes().get(1) != Some(&b':') { return None; } disk.to_string() };
+    if plain.len() < 260 { Some(plain) } else { None }
+}
 fn sidecar_of(f: &Path) -> PathBuf { let mut s = f.as_os_str().to_owned(); s.push(".comments.json"); PathBuf::from(s) }
 
 /// Resolve a client path against the root and refuse anything outside it (symlinks included).
 fn resolve(root: &Path, p: &str, for_write: bool) -> Result<PathBuf, E> {
     let joined = root.join(if p.is_empty() { "." } else { p });
-    let real = match joined.canonicalize() {
+    let real = match real_path(&joined) {
         Ok(r) => r,
         Err(_) if for_write => {
-            let parent = match joined.parent().and_then(|x| x.canonicalize().ok()) { Some(x) => x, None => return fail(404, "Folder not found") };
+            let parent = match joined.parent().and_then(|x| real_path(x).ok()) { Some(x) => x, None => return fail(404, "Folder not found") };
             match joined.file_name() { Some(n) => parent.join(n), None => return fail(403, "Bad path") }
         }
         Err(_) => return fail(404, &format!("Not found: {}", p)),
@@ -218,7 +232,7 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
                 if is_dir { if matches!(name.as_str(), "node_modules" | "target" | "dist" | "build") { continue; } }
                 else if !is_text(&full) { continue; }
                 else if is_notes(&full) && notes_base(&full).is_file() { continue; }
-                match full.canonicalize() { Ok(r) if r.starts_with(&st.root) => {}, _ => continue }
+                match real_path(&full) { Ok(r) if r.starts_with(&st.root) => {}, _ => continue }
                 out.push((is_dir, name, full));
             }
             out.sort_by(|x, y| y.0.cmp(&x.0).then(x.1.to_lowercase().cmp(&y.1.to_lowercase())));
@@ -455,7 +469,7 @@ impl Web {
     }
     pub fn start(&self, root: String, port: u16, lan: bool, token: Option<String>) -> Result<Info, String> {
         self.stop();
-        let root = Path::new(&root).canonicalize().map_err(|e| format!("Cannot open folder: {}", e))?;
+        let root = real_path(Path::new(&root)).map_err(|e| format!("Cannot open folder: {}", e))?;
         if !root.is_dir() { return Err("The shared path is not a folder".into()); }
         let host = if lan { "0.0.0.0" } else { "127.0.0.1" };
         let server = Arc::new(Server::http((host, port)).map_err(|e| format!("Cannot listen on {}:{} ({})", host, port, e))?);
@@ -501,7 +515,7 @@ mod tests {
             {"id": "c1", "status": "sent", "batchId": "b1", "quote": "Who owns the retry code?", "comment": "Name the team"},
             {"id": "c2", "status": "sent", "batchId": "b1", "quote": "Coupons stay.", "comment": "Why?"}
         ]}).to_string()).unwrap();
-        let st = state(dir.canonicalize().unwrap());
+        let st = state(real_path(&dir).unwrap());
 
         api(&st, "reply", &json!({"file": doc.to_string_lossy(), "batch": "b1", "comment": "c1", "lines": "3-3", "text": "Named the team"})).unwrap_or_else(|E(_, m)| panic!("{}", m));
 
@@ -519,7 +533,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("doc.md"), "# Doc\n").unwrap();
         std::fs::write(dir.join("meeting.notes.md"), "a file of its own\n").unwrap();
-        let st = state(dir.canonicalize().unwrap());
+        let st = state(real_path(&dir).unwrap());
         let ok = |cmd: &str, a: Value| api(&st, cmd, &a).unwrap_or_else(|E(_, m)| panic!("{}", m));
 
         ok("save_file", json!({"path": "doc.md.notes.md", "text": "remember this"}));
@@ -530,5 +544,15 @@ mod tests {
         ok("delete_notes", json!({"path": "doc.md.notes.md"}));
         assert_eq!(ok("read_optional", json!({"path": "doc.md.notes.md"})), Value::Null);
         assert!(api(&st, "delete_notes", &json!({"path": "doc.md"})).is_err());
+    }
+
+    #[test]
+    fn windows_paths_lose_the_verbatim_prefix() {
+        assert_eq!(plain_windows(r"\\?\C:\Users\diego\notes.md").as_deref(), Some(r"C:\Users\diego\notes.md"));
+        assert_eq!(plain_windows(r"\\?\UNC\nas\share\a.md").as_deref(), Some(r"\\nas\share\a.md"));
+        assert_eq!(plain_windows(r"C:\Users\a.md"), None);
+        assert_eq!(plain_windows(r"\\?\Volume{1234}\a.md"), None);
+        let long = format!(r"\\?\C:\{}", "x".repeat(300));
+        assert_eq!(plain_windows(&long), None);
     }
 }
