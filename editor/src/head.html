@@ -206,7 +206,7 @@ figure.mm.sel .mm-insp { display: flex; }
 @media (max-width: 700px) {
   #scroll > .wrap { padding: 0; }
   #doc, #srcwrap { --pt: 22px; border: 0; border-radius: 0; box-shadow: none; padding-inline: 16px; }
-  .seg span, #bCom span:not(.badge), .brand { display: none; }
+  .seg span, #bCom span:not(.badge), #bNotes span:not(.ndot), .brand { display: none; }
   .row1 { gap: 6px; }
   .grp { padding-left: 4px; }
   .row2 { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-inline: 8px; }
@@ -265,7 +265,7 @@ figure.mm.sel .mm-insp { display: flex; }
 #srcnumin { font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); padding-left: 3.6em; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
 #srcnumin div { position: relative; color: transparent; }
 #srcnumin div::before { content: attr(data-n); position: absolute; left: -3.6em; width: 3em; text-align: right; color: var(--muted); }
-.bar, #rail, #side, #cpanel, .status, #sharebox, #settings, #histbox { zoom: var(--uizoom, 1); }
+.bar, #rail, #side, #cpanel, #npanel, .status, #sharebox, #settings, #histbox { zoom: var(--uizoom, 1); }
 .body { flex: 1; min-height: 0; display: flex; }
 #scroll { flex: 1; min-width: 0; }
 #side { width: 260px; flex: none; display: flex; flex-direction: column; background: var(--surface); border-right: 1px solid var(--border); min-height: 0; }
@@ -328,6 +328,15 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
 .crow { display: flex; gap: 6px; }
 #cfab { position: fixed; z-index: 20; font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 @media (max-width: 700px) { #cpanel { position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
+/* notes */
+#npanel { width: min(340px, 100%); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
+#npanel .cbody { overflow: hidden; }
+#nText { flex: 1; min-height: 0; width: 100%; resize: none; font: inherit; font-size: 14px; line-height: 1.55; color: var(--fg); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 10px 12px; outline: none; }
+#nText:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+#nWhere { text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.ndot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
+.ndot[hidden] { display: none; }
+@media (max-width: 700px) { #npanel { position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
 #shFolder { text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 .shrow { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .shrow input[type=number] { width: 90px; font: inherit; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--fg); }
@@ -389,6 +398,7 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9l-.8-1.2A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
   <symbol id="i-outline" viewBox="0 0 24 24"><path d="M3 6h18M7 12h14M11 18h10"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M16 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
 </svg>
 <div id="app">
@@ -411,6 +421,7 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
       </div>
       <div class="grp">
         <button class="btn ghost" id="bCom" type="button" title="Review comments (Ctrl+Alt+M adds one on the selection)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-com"/></svg><span>Comments</span><span id="bComN" class="badge" hidden></span></button>
+        <button class="btn ghost" id="bNotes" type="button" title="Add notes for this file (Ctrl+Alt+N)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-note"/></svg><span>Notes</span><span id="bNotesDot" class="ndot" hidden></span></button>
         <button class="btn ghost icon" id="bShare" type="button" title="Share: use this app from your phone or another computer" aria-label="Share" hidden><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-phone"/></svg></button>
         <button class="btn ghost icon" id="bSet" type="button" title="Settings (Ctrl+,)" aria-label="Settings" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-gear"/></svg></button>
       </div>
@@ -494,6 +505,16 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
           <textarea id="cCopyText" rows="6" readonly></textarea>
         </div>
         <div id="clist" class="clist"></div>
+      </div>
+    </aside>
+    <aside id="npanel" hidden aria-label="Notes">
+      <div class="side-head">
+        <span class="side-name">Notes <span id="nState" class="cbadge"></span></span>
+        <button type="button" class="btn sm" id="nClose" title="Hide panel" aria-label="Hide notes">&times;</button>
+      </div>
+      <div class="cbody">
+        <textarea id="nText" spellcheck="true" aria-label="Notes for this file" placeholder="Your notes on this file: ideas, questions, things to look up. They save as you type and stay with the file."></textarea>
+        <div id="nWhere" class="cnote"></div>
       </div>
     </aside>
   </div>

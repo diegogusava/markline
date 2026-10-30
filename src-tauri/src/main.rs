@@ -41,6 +41,15 @@ async fn save_file(app: tauri::AppHandle, path: Option<String>, suggested: Strin
     Ok(Some(Saved { path: target.to_string_lossy().into_owned(), name: file_name(&target) }))
 }
 
+/// `doc.md.notes.md` next to an existing `doc.md`: the notes sidecar, hidden in the file list
+fn notes_of(p: &Path) -> Option<std::path::PathBuf> {
+    let s = p.to_string_lossy();
+    let base = s.strip_suffix(".notes.md")?;
+    let lower = base.to_lowercase();
+    if !(lower.ends_with(".md") || lower.ends_with(".markdown") || lower.ends_with(".txt")) { return None; }
+    Some(Path::new(base).to_path_buf())
+}
+
 #[derive(Serialize)]
 struct Entry { name: String, path: String, is_dir: bool }
 
@@ -66,6 +75,7 @@ fn list_dir(path: String) -> Result<Vec<Entry>, String> {
         } else {
             let ext = p.extension().map(|x| x.to_string_lossy().to_lowercase()).unwrap_or_default();
             if !matches!(ext.as_str(), "md" | "markdown" | "txt") { continue; }
+            if notes_of(&p).map_or(false, |b| b.is_file()) { continue; }
         }
         out.push(Entry { name, path: p.to_string_lossy().into_owned(), is_dir });
     }
@@ -82,6 +92,16 @@ fn read_optional(path: String) -> Result<Option<String>, String> {
         Ok(t) => Ok(Some(t)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(e.to_string()),
+    }
+}
+
+/// emptied notes: remove the sidecar instead of leaving an empty file
+#[tauri::command]
+fn delete_notes(path: String) -> Result<(), String> {
+    if notes_of(Path::new(&path)).is_none() { return Err("Not a notes file".into()); }
+    match std::fs::remove_file(&path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
+        _ => Ok(()),
     }
 }
 
@@ -148,7 +168,7 @@ fn main() {
     tauri::Builder::default()
         .manage(web::Web::default())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, stat, web_start, web_stop, web_status, send_batch, open_url])
+        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, delete_notes, stat, web_start, web_stop, web_status, send_batch, open_url])
         .run(tauri::generate_context!())
         .expect("error while running Markline");
 }

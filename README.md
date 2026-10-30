@@ -9,6 +9,7 @@ A Markdown editor for people who review documents with a coding agent. You write
 - **Write in the rendered view.** Headings, lists, tables, code and front matter are edited in place, and saved as plain Markdown. Switch to **Source** at any time: the caret keeps its place in the text and on the screen.
 - **Edit Mermaid diagrams visually.** Flowcharts, architecture diagrams with groups, ER schemas and class diagrams. Click a node to rename it, change its shape or connect it. **Code** shows the Mermaid text.
 - **Review with an agent.** Select text, add a comment, press **Send to agent**. The agent runs `markline poll`, edits the file and runs `markline reply`. Each reply shows under its comment, and clicking the comment jumps to the changed text.
+- **Keep notes per file.** **Notes** opens a side panel with your own notes on the open file. They save as you type, next to the file as `NAME.md.notes.md`.
 - **Keep comments on track.** Comments are anchored to the quoted text, not to line numbers. If you rewrite the passage, the comment shows **Text changed** and points to the closest match.
 - **Use it from your phone.** **Share** starts a small web server for one folder, protected by a token.
 - **Work offline.** One binary, no Node server at runtime, light and dark themes.
@@ -74,8 +75,11 @@ sudo install -m755 src-tauri/target/release/markline /usr/local/bin/
 | Indent | `Tab` / `Shift+Tab`: nests list items, moves between table cells (the last cell adds a row), indents code and Source lines |
 | Full path of the file | under the file name; click it to copy |
 | Comment on a passage | select text, then `Ctrl+Alt+M` or click the Comment bubble |
+| Notes on the file | **Notes** in the top bar, or `Ctrl+Alt+N` |
 
 Comments are highlighted in Rendered view and listed in the side panel with line numbers. They are anchored to the quoted text, so they survive edits elsewhere. When the quoted text itself was rewritten, the comment shows **Text changed** and a line like `~L35`: clicking it selects the closest match, found from the text that stood around the quote.
+
+Notes are free text for you, not for the agent. Each file has its own, saved as you type in `NAME.md.notes.md` next to it (in the browser's storage for a file that is not on disk yet). The file list hides these notes files, and clearing a note deletes its file. A dot on the **Notes** button shows that the open file has notes.
 
 ### Review with Copilot
 

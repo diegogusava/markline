@@ -133,6 +133,8 @@ fn lower_ends(p: &Path, suffixes: &[&str]) -> bool {
 }
 fn is_text(p: &Path) -> bool { lower_ends(p, &[".md", ".markdown", ".txt"]) }
 fn is_sidecar(p: &Path) -> bool { lower_ends(p, &[".md.comments.json", ".markdown.comments.json", ".txt.comments.json"]) }
+fn is_notes(p: &Path) -> bool { lower_ends(p, &[".md.notes.md", ".markdown.notes.md", ".txt.notes.md"]) }
+fn notes_base(p: &Path) -> PathBuf { let s = p.to_string_lossy(); PathBuf::from(&s[..s.len() - ".notes.md".len()]) }
 fn name_of(p: &Path) -> String { p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default() }
 fn mtime(p: &Path) -> f64 {
     std::fs::metadata(p).and_then(|m| m.modified()).ok()
@@ -215,6 +217,7 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
                 let is_dir = match std::fs::metadata(&full) { Ok(m) => m.is_dir(), Err(_) => continue };
                 if is_dir { if matches!(name.as_str(), "node_modules" | "target" | "dist" | "build") { continue; } }
                 else if !is_text(&full) { continue; }
+                else if is_notes(&full) && notes_base(&full).is_file() { continue; }
                 match full.canonicalize() { Ok(r) if r.starts_with(&st.root) => {}, _ => continue }
                 out.push((is_dir, name, full));
             }
@@ -238,6 +241,11 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
             if !is_text(&f) && !is_sidecar(&f) { return fail(403, "Only .md, .markdown, .txt files can be saved"); }
             std::fs::write(&f, text).map_err(|e| E(500, e.to_string()))?;
             Ok(json!({"path": f.to_string_lossy(), "name": name_of(&f)}))
+        }
+        "delete_notes" => {
+            let f = resolve(&st.root, &path("path"), true)?;
+            if !is_notes(&f) { return fail(403, "Not a notes file"); }
+            match std::fs::remove_file(&f) { Err(e) if e.kind() != std::io::ErrorKind::NotFound => fail(500, &e.to_string()), _ => Ok(Value::Null) }
         }
         "stat" => {
             let f = resolve(&st.root, &path("path"), true)?;
@@ -503,5 +511,24 @@ mod tests {
             (s(&c[0], "status"), s(&c[0], "quote"), s(&c[0], "was"), s(&c[1], "status")),
             ("applied", "- The payments team owns retries.", "Who owns the retry code?", "sent")
         );
+    }
+
+    #[test]
+    fn notes_save_read_hide_from_the_list_and_delete() {
+        let dir = std::env::temp_dir().join(format!("markline-notes-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("doc.md"), "# Doc\n").unwrap();
+        std::fs::write(dir.join("meeting.notes.md"), "a file of its own\n").unwrap();
+        let st = state(dir.canonicalize().unwrap());
+        let ok = |cmd: &str, a: Value| api(&st, cmd, &a).unwrap_or_else(|E(_, m)| panic!("{}", m));
+
+        ok("save_file", json!({"path": "doc.md.notes.md", "text": "remember this"}));
+        let names: Vec<String> = ok("list_dir", json!({"path": ""})).as_array().unwrap().iter().map(|e| s(e, "name").to_string()).collect();
+        assert_eq!(names, vec!["doc.md", "meeting.notes.md"]);
+        assert_eq!(ok("read_optional", json!({"path": "doc.md.notes.md"})), json!("remember this"));
+
+        ok("delete_notes", json!({"path": "doc.md.notes.md"}));
+        assert_eq!(ok("read_optional", json!({"path": "doc.md.notes.md"})), Value::Null);
+        assert!(api(&st, "delete_notes", &json!({"path": "doc.md"})).is_err());
     }
 }
