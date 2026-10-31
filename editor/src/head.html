@@ -24,6 +24,7 @@
   --danger: #b3261e;
   --warn-bg: #fde8d4;
   --warn-fg: #9a4a00;
+  --good-fg: #1d7a3e;
   --shadow: 0 1px 2px rgba(16,32,40,.06), 0 8px 24px rgba(16,32,40,.06);
   --font-ui: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -47,6 +48,7 @@
     --danger: #f2877f;
     --warn-bg: #3d2412;
     --warn-fg: #f5a25d;
+    --good-fg: #5fd38a;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
     color-scheme: dark;
   }
@@ -69,6 +71,7 @@
   --danger: #f2877f;
   --warn-bg: #3d2412;
   --warn-fg: #f5a25d;
+  --good-fg: #5fd38a;
   --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
   color-scheme: dark;
 }
@@ -209,7 +212,7 @@ figure.mm.sel .mm-insp { display: flex; }
 @media (max-width: 700px) {
   #scroll > .wrap { padding: 0; }
   #doc, #srcwrap { --pt: 22px; border: 0; border-radius: 0; box-shadow: none; padding-inline: 16px; }
-  .seg span, #bCom span:not(.badge), #bNotes span:not(.ndot), .brand { display: none; }
+  .seg span, #bCom span:not(.badge), #bNotes span:not(.ndot), #bRead span, .brand { display: none; }
   .row1 { gap: 6px; }
   .grp { padding-left: 4px; }
   .row2 { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-inline: 8px; }
@@ -332,6 +335,50 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
 .crow { display: flex; gap: 6px; }
 #cfab { position: fixed; z-index: 20; font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 @media (max-width: 700px) { #cpanel { position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
+/* readability (Hemingway-style): sentence colors under word colors */
+:root { --r-hard: rgba(236, 196, 0, .32); --r-vhard: rgba(235, 70, 85, .26); --r-adverb: rgba(60, 140, 255, .28); --r-passive: rgba(40, 175, 90, .28); --r-complex: rgba(160, 90, 230, .28); }
+::highlight(ml-rh) { background-color: var(--r-hard); }
+::highlight(ml-rv) { background-color: var(--r-vhard); }
+::highlight(ml-ra) { background-color: var(--r-adverb); }
+::highlight(ml-rp) { background-color: var(--r-passive); }
+::highlight(ml-rc) { background-color: var(--r-complex); }
+::highlight(ml-rx) { text-decoration: underline 2px var(--accent); text-underline-offset: 3px; }
+#rpanel { width: min(320px, 100%); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
+#rpanel[hidden] { display: none; }
+.rgrade { display: flex; align-items: baseline; gap: 10px; }
+.rgrade b { font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
+#rGradeL, .rchip { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--code-bg); color: var(--muted); }
+#rGradeL[data-g="good"], .rchip[data-g="good"] { background: rgba(40, 175, 90, .16); color: var(--good-fg); }
+#rGradeL[data-g="ok"], .rchip[data-g="ok"] { background: var(--warn-bg); color: var(--warn-fg); }
+#rGradeL[data-g="bad"], .rchip[data-g="bad"] { background: rgba(235, 70, 85, .16); color: var(--danger); }
+.rhelp { font-size: 12px; line-height: 1.45; color: var(--muted); }
+.rstats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.rstats b { color: var(--fg); font-weight: 600; }
+.rlist { display: flex; flex-direction: column; gap: 6px; }
+.rrow { display: flex; align-items: stretch; gap: 0; border-radius: 9px; overflow: hidden; border: 1px solid var(--border); }
+.rsw { display: grid; place-items: center; width: 34px; flex: none; cursor: pointer; }
+.rsw input { position: absolute; opacity: 0; pointer-events: none; }
+.rsw i { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--fg); opacity: .6; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 700; line-height: 1; color: var(--fg); }
+.rsw i::after { content: "\2713"; }
+.rrow[data-k="hard"] .rsw, .rrow[data-k="hard"] .rtxt { background: var(--r-hard); }
+.rrow[data-k="vhard"] .rsw, .rrow[data-k="vhard"] .rtxt { background: var(--r-vhard); }
+.rrow[data-k="adverb"] .rsw, .rrow[data-k="adverb"] .rtxt { background: var(--r-adverb); }
+.rrow[data-k="passive"] .rsw, .rrow[data-k="passive"] .rtxt { background: var(--r-passive); }
+.rrow[data-k="complex"] .rsw, .rrow[data-k="complex"] .rtxt { background: var(--r-complex); }
+.rrow.off .rsw i::after { content: ""; }
+.rsw:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rtxt { flex: 1; font: inherit; font-size: 13px; line-height: 1.4; text-align: left; color: var(--fg); border: 0; padding: 8px 10px; cursor: pointer; }
+.rtxt b { font-weight: 600; }
+.rtxt:hover:not(:disabled) { filter: brightness(.96); }
+.rtxt:disabled { cursor: default; }
+.rrow.off .rtxt { opacity: .55; }
+.rchip { border: 0; font-family: inherit; cursor: pointer; }
+#rtip { position: fixed; z-index: 25; max-width: 260px; padding: 6px 10px; border-radius: 8px; font-size: 12.5px; line-height: 1.4; color: var(--fg); background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow); pointer-events: none; }
+#rtip::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 7px; vertical-align: 0; }
+#rtip[data-k="hard"]::before { background: var(--r-hard); } #rtip[data-k="vhard"]::before { background: var(--r-vhard); }
+#rtip[data-k="adverb"]::before { background: var(--r-adverb); } #rtip[data-k="passive"]::before { background: var(--r-passive); }
+#rtip[data-k="complex"]::before { background: var(--r-complex); }
+@media (max-width: 700px) { #rpanel { position: absolute; right: 0; z-index: 5; height: 100%; box-shadow: 0 0 24px rgba(0,0,0,.25); } }
 /* notes */
 #npanel { position: relative; width: var(--nw, min(340px, 100%)); flex: none; display: flex; flex-direction: column; background: var(--surface); border-left: 1px solid var(--border); min-height: 0; }
 #npanel .cbody { overflow: hidden; }
@@ -407,6 +454,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
   <symbol id="i-outline" viewBox="0 0 24 24"><path d="M3 6h18M7 12h14M11 18h10"/></symbol>
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M16 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M8 9h8M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-read" viewBox="0 0 24 24"><path d="M3.3 19a10 10 0 1 1 17.4 0"/><path d="m12 14 4-5"/><circle cx="12" cy="14" r="1.2"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></symbol>
 </svg>
 <div id="app">
@@ -430,6 +478,7 @@ body.resizing { cursor: col-resize; user-select: none; }
       <div class="grp">
         <button class="btn ghost" id="bCom" type="button" title="Review comments (Ctrl+Alt+M adds one on the selection)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-com"/></svg><span>Comments</span><span id="bComN" class="badge" hidden></span></button>
         <button class="btn ghost" id="bNotes" type="button" title="Add notes for this file (Ctrl+Alt+N)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-note"/></svg><span>Notes</span><span id="bNotesDot" class="ndot" hidden></span></button>
+        <button class="btn ghost" id="bRead" type="button" title="Readability: color hard sentences, adverbs, passive voice and complex phrases, like the Hemingway editor (Ctrl+Alt+R)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-read"/></svg><span>Readability</span></button>
         <button class="btn ghost icon" id="bShare" type="button" title="Share: use this app from your phone or another computer" aria-label="Share" hidden><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-phone"/></svg></button>
         <button class="btn ghost icon" id="bSet" type="button" title="Settings (Ctrl+,)" aria-label="Settings" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-gear"/></svg></button>
       </div>
@@ -539,7 +588,23 @@ body.resizing { cursor: col-resize; user-select: none; }
         <div id="nWhere" class="cnote"></div>
       </div>
     </aside>
+    <aside id="rpanel" hidden aria-label="Readability">
+      <div class="side-head">
+        <span class="side-name">Readability</span>
+        <button type="button" class="btn sm" id="rOff" title="Remove the colors from the document">Turn off</button>
+        <button type="button" class="btn sm" id="rClose" title="Hide panel, keep the colors" aria-label="Hide readability">&times;</button>
+      </div>
+      <div class="cbody">
+        <div class="rgrade"><b id="rGradeN">Grade &ndash;</b><span id="rGradeL"></span></div>
+        <div class="rhelp">The school grade a reader needs to follow the text. Aim for 9 or lower.</div>
+        <div id="rStats" class="rstats"></div>
+        <div id="rList" class="rlist"></div>
+        <div id="rSrcNote" class="cwarn rhelp" hidden>Colors show in the Rendered view.</div>
+        <div class="rhelp">Click a line to jump to the next one. Point at a colored passage to see why. Checks work best on English text.</div>
+      </div>
+    </aside>
   </div>
+  <div id="rtip" role="tooltip" hidden></div>
   <button type="button" id="cfab" hidden>&#128172; Comment</button>
   <footer class="status wrap">
     <span id="msg" aria-live="polite"></span>
@@ -548,6 +613,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   <pre id="diffBody"></pre>
 </div>
     <span class="grow"></span>
+    <button type="button" id="rChip" class="rchip" hidden title="Readability grade. Click for details."></button>
     <span id="wc"></span>
   </footer>
 </div>
