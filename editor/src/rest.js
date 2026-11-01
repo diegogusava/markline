@@ -676,7 +676,7 @@ const ZKEY = 'markline-zoom-v1', WKEY = 'markline-width-v1', PKEY = 'markline-pr
 const WSTEPS = [['Narrow', '660px'], ['Default', '792px'], ['Wide', '980px'], ['Wider', '1200px'], ['Widest', '1500px'], ['Full', 'none']];
 const ZSTEPS = [0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const FONTS = { sans: '', serif: "Georgia, 'Times New Roman', serif", mono: 'var(--font-mono)' };
-const PDEF = { ui: 1, code: 14, lh: 1.65, font: 'sans', nums: false };
+const PDEF = { ui: 1, code: 14, lh: 1.65, font: 'sans', nums: false, read: false };
 const rootStyle = document.documentElement.style;
 let theme = 'auto', zoom = 1, widx = 1, prefs = Object.assign({}, PDEF);
 try {
@@ -739,6 +739,8 @@ function setPrefs(p) {
   $('#setFont').value = prefs.font;
   $('#setNums').checked = !!prefs.nums;
   $('#srcwrap').classList.toggle('nums', !!prefs.nums);
+  $('#setRead').checked = !!prefs.read;
+  if (window.onReadPref) window.onReadPref(!!prefs.read);
   numbers();
   keep(PKEY, JSON.stringify(prefs));
 }
@@ -749,6 +751,7 @@ $('#setUi').addEventListener('input', function (e) { setPrefs({ ui: e.target.val
 $('#setCode').addEventListener('input', function (e) { setPrefs({ code: Number(e.target.value) }); });
 $('#setLh').addEventListener('input', function (e) { setPrefs({ lh: Number(e.target.value) }); });
 $('#setNums').addEventListener('change', function (e) { setPrefs({ nums: e.target.checked }); });
+$('#setRead').addEventListener('change', function (e) { setPrefs({ read: e.target.checked }); });
 $('#setFont').addEventListener('change', function (e) { setPrefs({ font: e.target.value }); });
 $('#setWidth').addEventListener('change', function (e) { setWidth(parseInt(e.target.value, 10)); });
 $('#setReset').addEventListener('click', function () { setTheme('auto'); setZoom(1); setWidth(1); setPrefs(PDEF); });

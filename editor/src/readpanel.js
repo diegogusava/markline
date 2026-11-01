@@ -153,7 +153,7 @@ chip.addEventListener('click', function () { showPanel(panel.hidden); });
 /* on a phone the right-hand panels overlap: opening Comments or Notes hides this one */
 ['#bCom', '#bNotes'].forEach(function (s) { $(s).addEventListener('click', function () { if (narrow() && !panel.hidden) showPanel(false); }); });
 document.addEventListener('keydown', function (e) {
-  if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'r') { e.preventDefault(); setOn(!on, true); }
+  if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'r' && !btn.hidden) { e.preventDefault(); setOn(!on, true); }
   else if (e.key === 'Escape') hideTip();
 });
 const prevLoaded = window.onDocLoaded;
@@ -210,6 +210,12 @@ $('#scroll').addEventListener('scroll', function () { hideTip(); shown = null; }
 doc.addEventListener('input', function () { hideTip(); shown = null; if (HL) CSS.highlights.delete('ml-rx'); });
 
 try { hidden = new Set((localStorage.getItem(HIDE_KEY) || '').split(',').filter(Boolean)); } catch (e) { /* ignore */ }
-try { if (localStorage.getItem(ON_KEY)) setOn(true, !narrow()); } catch (e) { /* ignore */ }
+/* the tool is optional: Settings > Readability shows or hides it */
+window.onReadPref = function (enabled) {
+  btn.hidden = !enabled;
+  if (!enabled && on) setOn(false);
+};
+btn.hidden = !prefs.read;
+try { if (prefs.read && localStorage.getItem(ON_KEY)) setOn(true, !narrow()); } catch (e) { /* ignore */ }
 window.__marklineRead = { refresh: refresh, stats: function () { return last; }, items: function () { return items; } };
 })();

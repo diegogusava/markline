@@ -478,7 +478,7 @@ body.resizing { cursor: col-resize; user-select: none; }
       <div class="grp">
         <button class="btn ghost" id="bCom" type="button" title="Review comments (Ctrl+Alt+M adds one on the selection)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-com"/></svg><span>Comments</span><span id="bComN" class="badge" hidden></span></button>
         <button class="btn ghost" id="bNotes" type="button" title="Add notes for this file (Ctrl+Alt+N)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-note"/></svg><span>Notes</span><span id="bNotesDot" class="ndot" hidden></span></button>
-        <button class="btn ghost" id="bRead" type="button" title="Readability: color hard sentences, adverbs, passive voice and complex phrases, like the Hemingway editor (Ctrl+Alt+R)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-read"/></svg><span>Readability</span></button>
+        <button class="btn ghost" id="bRead" type="button" hidden title="Readability: color hard sentences, adverbs, passive voice and complex phrases, like the Hemingway editor (Ctrl+Alt+R)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-read"/></svg><span>Readability</span></button>
         <button class="btn ghost icon" id="bShare" type="button" title="Share: use this app from your phone or another computer" aria-label="Share" hidden><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-phone"/></svg></button>
         <button class="btn ghost icon" id="bSet" type="button" title="Settings (Ctrl+,)" aria-label="Settings" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-gear"/></svg></button>
       </div>
@@ -645,6 +645,7 @@ body.resizing { cursor: col-resize; user-select: none; }
     <label class="shrow"><span class="rl">Line spacing</span><input type="range" id="setLh" min="1.3" max="2" step="0.05"><output id="setLhV"></output></label>
     <label class="shrow"><span class="rl">Document font</span><select id="setFont"><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option></select></label>
     <label class="shrow"><span class="rl">Line numbers</span><input type="checkbox" id="setNums"> <span>in Source view</span></label>
+    <label class="shrow" title="Hemingway-style checks: hard sentences, adverbs, passive voice and complex phrases"><span class="rl">Readability</span><input type="checkbox" id="setRead"> <span>show the tool</span></label>
     <label class="shrow"><span class="rl">Page width</span><select id="setWidth"></select></label>
     <div class="cactions"><button type="button" class="btn sm" id="setReset">Reset to defaults</button></div>
     <div class="cnote" style="text-transform:none;letter-spacing:0">Ctrl+= and Ctrl+- resize the document text. Ctrl+, opens this panel.</div>
