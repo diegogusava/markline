@@ -13,7 +13,7 @@ options=('!debug')
 build() {
   cd "$startdir"
   npm install --no-audit --no-fund
-  node build-app.js
+  VERSION="$pkgver" node build-app.js
   npx tauri build --no-bundle
 }
 

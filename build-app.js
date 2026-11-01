@@ -16,6 +16,13 @@ for (const u in map) {
   fs.copyFileSync(here + 'node_modules/' + map[u][0], here + 'dist/' + map[u][1]);
   h = h.replace(u, map[u][1]);
 }
+// version shown in the app: CI passes VERSION (0.1.<build number>); otherwise the one in tauri.conf.json
+const version = process.env.VERSION || JSON.parse(fs.readFileSync(here + 'src-tauri/tauri.conf.json', 'utf8')).version;
+let commit = '';
+try { commit = require('child_process').execSync('git rev-parse --short HEAD', { cwd: here, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (e) { /* not a git checkout */ }
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+if (!h.includes('__VERSION__')) throw new Error('missing __VERSION__');
+h = h.split('__VERSION__').join(esc(version)).split('__COMMIT__').join(esc(commit));
 h = h.replace(/<link[^>]*fonts\.(googleapis|gstatic)[^>]*>\s*/g, '');
 fs.writeFileSync(here + 'dist/index.html', h);
-console.log('dist ready', h.length);
+console.log('dist ready', version, commit, h.length);
