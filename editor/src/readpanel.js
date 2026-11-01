@@ -5,7 +5,8 @@
 (function () {
 const panel = $('#rpanel'), btn = $('#bRead'), chip = $('#rChip'), tip = $('#rtip');
 const HL = !!(window.CSS && CSS.highlights && window.Highlight);
-const ON_KEY = 'markline-read-on-v1', HIDE_KEY = 'markline-read-hide-v1';
+const ON_KEY = 'markline-read-on-v1', HIDE_KEY = 'markline-read-hide-v1', LANG_KEY = 'markline-read-lang-v1';
+const LANG_NAMES = { en: 'English', pt: 'Portuguese' };
 const KINDS = [
   { k: 'vhard', hl: 'ml-rv', text: function (s) { return '<b>' + s.vhard + '</b> of ' + s.sentences + plural(s.sentences, ' sentence is', ' sentences are') + ' very hard to read.'; }, hint: 'Very hard to read. Split it into shorter sentences.' },
   { k: 'hard', hl: 'ml-rh', text: function (s) { return '<b>' + s.hard + '</b> of ' + s.sentences + plural(s.sentences, ' sentence is', ' sentences are') + ' hard to read.'; }, hint: 'Hard to read. Cut words or split it.' },
@@ -13,7 +14,7 @@ const KINDS = [
   { k: 'passive', hl: 'ml-rp', text: function (s) { return '<b>' + s.passive + '</b>' + plural(s.passive, ' use', ' uses') + ' of passive voice. ' + goal(s.passive, s.passiveGoal); } },
   { k: 'complex', hl: 'ml-rc', text: function (s) { return '<b>' + s.complex + '</b>' + plural(s.complex, ' phrase has', ' phrases have') + ' a simpler alternative.'; } }
 ];
-let on = false, hidden = new Set(), items = [], cursor = {}, timer = null, last = null;
+let on = false, lang = 'auto', hidden = new Set(), items = [], cursor = {}, timer = null, last = null;
 
 function plural(n, one, many) { return n === 1 ? one : many; }
 function goal(n, g) { return n <= g ? 'Well done.' : 'Aim for ' + g + ' or fewer.'; }
@@ -66,7 +67,7 @@ function refresh() {
   if (!on) return;
   if (mode !== 'rendered') { $('#rSrcNote').hidden = false; clear(); return; }
   $('#rSrcNote').hidden = true;
-  const blocks = collect(), res = rdAnalyze(blocks.map(function (b) { return b.s; }));
+  const blocks = collect(), res = rdAnalyze(blocks.map(function (b) { return b.s; }), lang);
   items = [];
   res.sentences.forEach(function (s) { if (s.level) items.push({ kind: s.level, r: range(blocks[s.blk], s.a, s.b), hint: null }); });
   res.marks.forEach(function (m) { items.push({ kind: m.kind, r: range(blocks[m.blk], m.a, m.b), hint: m.hint }); });
@@ -115,6 +116,8 @@ function render(s) {
     row.querySelector('.rtxt').addEventListener('click', function () { next(x.k); });
     $('#rList').appendChild(row);
   });
+  // "Auto" names the language it picked for this document
+  $('#rLang').options[0].textContent = 'Auto' + (s.words ? ' (' + LANG_NAMES[s.lang] + ')' : '');
   chip.hidden = !on || !s.words;
   chip.textContent = 'Grade ' + s.grade;
   chip.dataset.g = $('#rGradeL').dataset.g;
@@ -209,6 +212,14 @@ doc.addEventListener('mouseleave', function () { hideTip(); shown = null; });
 $('#scroll').addEventListener('scroll', function () { hideTip(); shown = null; }, { passive: true });
 doc.addEventListener('input', function () { hideTip(); shown = null; if (HL) CSS.highlights.delete('ml-rx'); });
 
+$('#rLang').addEventListener('change', function (e) {
+  lang = e.target.value;
+  try { localStorage.setItem(LANG_KEY, lang === 'auto' ? '' : lang); } catch (er) { /* ignore */ }
+  cursor = {}; hideTip(); refresh();
+});
+try { lang = localStorage.getItem(LANG_KEY) || 'auto'; } catch (e) { /* ignore */ }
+if (!LANG_NAMES[lang]) lang = 'auto';
+$('#rLang').value = lang;
 try { hidden = new Set((localStorage.getItem(HIDE_KEY) || '').split(',').filter(Boolean)); } catch (e) { /* ignore */ }
 /* the tool is optional: Settings > Readability shows or hides it */
 window.onReadPref = function (enabled) {

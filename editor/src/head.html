@@ -354,6 +354,8 @@ kbd { font: 11px var(--font-mono); padding: 1px 5px; border: 1px solid var(--bor
 #rGradeL[data-g="ok"], .rchip[data-g="ok"] { background: var(--warn-bg); color: var(--warn-fg); }
 #rGradeL[data-g="bad"], .rchip[data-g="bad"] { background: rgba(235, 70, 85, .16); color: var(--danger); }
 .rhelp { font-size: 12px; line-height: 1.45; color: var(--muted); }
+.rlang { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.rlang select { font: inherit; font-size: 13px; padding: 3px 6px; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--fg); }
 .rstats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .rstats b { color: var(--fg); font-weight: 600; }
 .rlist { display: flex; flex-direction: column; gap: 6px; }
@@ -599,10 +601,11 @@ body.resizing { cursor: col-resize; user-select: none; }
       <div class="cbody">
         <div class="rgrade"><b id="rGradeN">Grade &ndash;</b><span id="rGradeL"></span></div>
         <div class="rhelp">The school grade a reader needs to follow the text. Aim for 9 or lower.</div>
+        <label class="rlang"><span>Language</span><select id="rLang" title="Which language rules to check with"><option value="auto">Auto</option><option value="en">English</option><option value="pt">Portuguese</option></select></label>
         <div id="rStats" class="rstats"></div>
         <div id="rList" class="rlist"></div>
         <div id="rSrcNote" class="cwarn rhelp" hidden>Colors show in the Rendered view.</div>
-        <div class="rhelp">Click a line to jump to the next one. Point at a colored passage to see why. Checks work best on English text.</div>
+        <div class="rhelp">Click a line to jump to the next one. Point at a colored passage to see why. Checks English and Portuguese text.</div>
       </div>
     </aside>
   </div>
