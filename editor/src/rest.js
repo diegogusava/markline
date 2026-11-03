@@ -706,6 +706,7 @@ function setTheme(t) {
   else document.documentElement.setAttribute('data-theme', t);
   $('#setTheme').value = t;
   keep(TKEY, t);
+  doc.querySelectorAll('figure.mm .mm-canvas[data-mm-src]').forEach(function (c) { renderMermaidPreview(c, c.dataset.mmSrc); });
 }
 function setZoom(z) {
   zoom = Math.min(3, Math.max(0.6, Math.round(z * 100) / 100));

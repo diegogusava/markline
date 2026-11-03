@@ -8,7 +8,8 @@ let h = rd('head.html') + "<script>\n(function () {\n'use strict';\n" + js + "\n
 const map = {
   'https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js': ['marked/marked.min.js', 'vendor/marked.min.js'],
   'https://cdn.jsdelivr.net/npm/turndown@7.1.2/dist/turndown.js': ['turndown/lib/turndown.browser.umd.js', 'vendor/turndown.js'],
-  'https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js': ['turndown-plugin-gfm/dist/turndown-plugin-gfm.js', 'vendor/turndown-plugin-gfm.js']
+  'https://cdn.jsdelivr.net/npm/turndown-plugin-gfm@1.0.2/dist/turndown-plugin-gfm.js': ['turndown-plugin-gfm/dist/turndown-plugin-gfm.js', 'vendor/turndown-plugin-gfm.js'],
+  'https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js': ['mermaid/dist/mermaid.min.js', 'vendor/mermaid.min.js']
 };
 fs.mkdirSync(here + 'dist/vendor', { recursive: true });
 for (const u in map) {

@@ -17,6 +17,35 @@ const STARTERS = {
 function firstLine(src) {
   return String(src).split('\n').map(function (l) { return l.replace(/%%.*$/, '').trim(); }).filter(Boolean)[0] || '';
 }
+/* Diagrams the visual editors can't handle are drawn read-only by the Mermaid library */
+let mermaidSeq = 0, mermaidTheme = null;
+function isDark() {
+  const t = document.documentElement.getAttribute('data-theme');
+  return t ? t === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+function renderMermaidPreview(el, src) {
+  const lib = window.mermaid;
+  if (!lib || !String(src).trim()) {
+    el.innerHTML = '<div class="mm-empty">This diagram type has no visual editor yet. Edit it as code below.</div>';
+    return;
+  }
+  const theme = isDark() ? 'dark' : 'default';
+  if (theme !== mermaidTheme) {
+    lib.initialize({ startOnLoad: false, securityLevel: 'strict', theme: theme });
+    mermaidTheme = theme;
+  }
+  const token = String(++mermaidSeq);
+  el.dataset.mmToken = token;
+  lib.render('mmprev' + token, String(src)).then(function (r) {
+    if (el.dataset.mmToken === token) el.innerHTML = '<div class="mm-preview">' + r.svg + '</div>';
+  }).catch(function (e) {
+    if (el.dataset.mmToken !== token) return;
+    const d = document.getElementById('dmmprev' + token);
+    if (d) d.remove();
+    el.innerHTML = '<div class="mm-empty"></div>';
+    el.firstChild.textContent = 'Could not draw this diagram: ' + String((e && e.message) || e).split('\n')[0];
+  });
+}
 function detectKind(src) {
   const f = firstLine(src);
   if (/^(flowchart|graph)\b/i.test(f)) return 'flow';
@@ -91,9 +120,10 @@ function initBlock(fig) {
     connectBtn.classList.toggle('on', S.mode === 'connect');
     msg.textContent = S.note || (S.mode === 'connect' ? (S.from ? 'Now click the target' : 'Click the source') : '');
     if (!S.model) {
-      canvas.innerHTML = '<div class="mm-empty">This diagram type has no visual editor yet. Edit it as code below.</div>';
+      if (canvas.dataset.mmSrc !== S.src || !canvas.firstChild) { canvas.dataset.mmSrc = S.src; renderMermaidPreview(canvas, S.src); }
       return;
     }
+    delete canvas.dataset.mmSrc;
     canvas.innerHTML = K().render(S.model, S, uid);
   }
   function renderInsp() {
@@ -106,7 +136,7 @@ function initBlock(fig) {
     codeWrap.hidden = !(S.code || forced);
     codeBtn.classList.toggle('on', S.code);
     if (!codeWrap.hidden && document.activeElement !== ta) ta.value = S.src;
-    note.textContent = forced ? 'Visual editing supports flowcharts, class diagrams and ER diagrams. This block stays as code.' : '';
+    note.textContent = forced ? 'Visual editing supports simple flowcharts, class diagrams and ER diagrams. The picture above is a preview; edit this one as code.' : '';
   }
   function renderAll() { renderBar(); renderCanvas(); renderInsp(); renderCode(); }
   function after(didChange) {
