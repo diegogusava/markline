@@ -26,6 +26,36 @@ function renderMarkdown(marked, md, opts) {
   return out;
 }
 
+// Source ranges for the rendered top-level blocks. Definitions and blank lines
+// have no rendered block. Raw HTML islands consume all tokens up to their close tag.
+function markdownSourceRanges(marked, md, opts) {
+  md = md.replace(/\r\n?/g, '\n');
+  md = opts && opts.pedantic ? md.replace(/\t/g, '    ').replace(/^ +$/gm, '') : md.replace(/^( *)(\t+)/gm, function (_, spaces, tabs) { return spaces + '    '.repeat(tabs.length); });
+  const tokens = marked.lexer(md, Object.assign({}, marked.defaults, opts));
+  const ranges = [];
+  let cursor = 0, line = 1, i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i];
+    const at = md.indexOf(token.raw, cursor);
+    if (at < 0) { i++; continue; }
+    line += (md.slice(cursor, at).match(/\n/g) || []).length;
+    const start = line;
+    let raw = token.raw;
+    i++;
+    if (token.type === 'html') {
+      let depth = Math.max(0, tagDepth(raw));
+      while (depth > 0 && i < tokens.length) {
+        depth = Math.max(0, depth + tagDepth(tokens[i].raw));
+        raw += tokens[i++].raw;
+      }
+    }
+    if (token.type !== 'space') ranges.push({ start: start, end: start + (raw.trimEnd().match(/\n/g) || []).length });
+    cursor = at + raw.length;
+    line += (raw.match(/\n/g) || []).length;
+  }
+  return ranges;
+}
+
 function createMarkdownConverter(TurndownService, gfm) {
   const isRaw = function (n) { return n.nodeName === 'DIV' && n.classList && n.classList.contains('raw'); };
   const rawOut = function (n) { return '\n\n' + n.getAttribute('data-src') + '\n\n'; };
@@ -62,4 +92,4 @@ function createMarkdownConverter(TurndownService, gfm) {
   return td;
 }
 
-if (typeof module !== 'undefined' && module.exports) { module.exports = createMarkdownConverter; module.exports.renderMarkdown = renderMarkdown; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = createMarkdownConverter; module.exports.renderMarkdown = renderMarkdown; module.exports.markdownSourceRanges = markdownSourceRanges; }

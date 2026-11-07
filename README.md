@@ -6,7 +6,10 @@ A Markdown editor for people who review documents with a coding agent. You write
 
 ## What it does
 
-- **See Git changes in Source view.** With line numbers enabled, the gutter marks added lines in green, edited lines in blue, and deletions in red. Changes include unsaved edits and compare against the last commit (HEAD). New files appear as additions. Git must be installed; ignored files and files outside a repository have no markers.
+- **See source lines and Git changes in both views.** Enable **Settings > Line numbers**. Source view labels every line. Rendered view labels each block with its starting Markdown line and combines its Git changes in the gutter. Green marks additions, blue marks edits, and red marks deletions. Changes include unsaved edits and compare against the last commit (HEAD). New files appear as additions. Git must be installed; ignored files and files outside a repository have no markers.
+- **Find and replace in the file.** Use **Edit > Find…** or **Ctrl+F** to find text in either view. Use **Edit > Replace…**, **Ctrl+H**, or **Replace…** in the search bar, to replace one match or all matches. Replace opens Source view and includes Markdown syntax and link addresses. Search is literal and ignores case. Undo restores a replacement in one step.
+- **Manage files from the File menu.** Create a file, open a file or folder, save, or save a copy with **Save as…**.
+- **Save as you type.** Auto save is on by default for files with a writable location. It saves after one second of inactivity in either view, including replacements and Undo. Save a new file once to choose its location. Disable it in **Settings > Auto save**. If the file changed on disk, auto save pauses so you can reload or save your edits explicitly.
 - **Write in the rendered view.** Headings, lists, tables, code and front matter are edited in place, and saved as plain Markdown. Switch to **Source** at any time: the caret keeps its place in the text and on the screen.
 - **Edit Mermaid diagrams visually.** Flowcharts, architecture diagrams with groups, ER schemas and class diagrams. Click a node to rename it, change its shape or connect it. **Code** shows the Mermaid text.
 - **Review with an agent.** Select text, add a comment, press **Send to agent**. The agent runs `markline poll`, edits the file and runs `markline reply`. Each reply shows under its comment, and clicking the comment jumps to the changed text.
@@ -70,13 +73,17 @@ sudo install -m755 src-tauri/target/release/markline /usr/local/bin/
 | Show or hide the side panel | folder or outline icon on the left edge, or `Ctrl+\` |
 | Jump to a heading | outline icon, then click the heading |
 | Open a folder | **Open...** in the side panel (the last folder is remembered) |
+| New file; open file | **File** menu, or **Ctrl+N** / **Ctrl+O** |
+| Save; save as | **File** menu, or **Ctrl+S** / **Ctrl+Shift+S** |
+| Auto save | enabled by default for existing files; toggle in **Settings > Auto save** |
 | Insert a diagram | **Diagram** menu in the format bar |
 | Text size | `Ctrl` + `-` / `=` / `0`, `Ctrl` + wheel, or **Settings** |
 | Find in the document; next / previous match | **Ctrl+F**; **Enter** / **Shift+Enter** (Esc closes) |
+| Find and replace | **Ctrl+H**, or **Replace…** in the search bar; **Enter** in the replacement field replaces one match, **Ctrl+Enter** replaces all |
 | Theme, fonts, line numbers, page width | **Settings** (gear icon, `Ctrl+,`) |
-| Undo, redo, history | arrow icons and the clock icon, or `Ctrl+Z` / `Ctrl+Shift+Z` |
+| Undo, redo, history | **Edit** menu, arrow icons and the clock icon, or `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Indent | `Tab` / `Shift+Tab`: nests list items, moves between table cells (the last cell adds a row), indents code and Source lines |
-| Full path of the file | under the file name; click it to copy |
+| Full path of the file | beside the file name, below the File and Edit menus; click it to copy |
 | Comment on a passage | select text, then `Ctrl+Alt+M` or click the Comment bubble |
 | Notes on the file | **Notes** in the top bar, or `Ctrl+Alt+N` |
 

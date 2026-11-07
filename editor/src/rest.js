@@ -37,6 +37,8 @@ const td = createMarkdownConverter(TurndownService, window.turndownPluginGfm && 
 
 const doc = $('#doc'), srcEl = $('#src');
 let mode = 'rendered', name = 'sample.md', fileHandle = null, dirty = false, saveTimer = null, countTimer = null, msgTimer = null;
+let renderedLineText = '', renderedLineCanonical = '';
+let docGeneration = 0, autoTimer = null, autoSaving = false, saveQueue = Promise.resolve();
 const KEY = 'markline-draft-v1';
 
 function ensureParagraphs() {
@@ -82,6 +84,7 @@ function renderBlocks(md) {
   return blockHtml(sanitize(renderMarkdown(marked, m ? md.slice(m[0].length) : md, MARKED_OPTS)));
 }
 function loadMarkdown(md) {
+  const source = md;
   let fm = null;
   const m = FM_RE.exec(md);
   if (m) { fm = m[1]; md = md.slice(m[0].length); }
@@ -92,6 +95,8 @@ function loadMarkdown(md) {
   doc.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.removeAttribute('disabled'); });
   doc.querySelectorAll('figure.mm').forEach(initBlock);
   ensureParagraphs();
+  renderedLineText = source;
+  renderedLineCanonical = docToMarkdown();
 }
 function docToMarkdown(clone) {
   const c = clone || doc.cloneNode(true);
@@ -117,7 +122,7 @@ function updateStatus() {
   fp.title = path ? path + ' (click to copy)' : '';
   $('#dot').hidden = !dirty;
   $('#bSave').classList.toggle('primary', dirty);
-  $('#bSave').textContent = dirty ? 'Save' : 'Saved';
+  $('#bSave').textContent = autoSaving ? 'Saving…' : dirty ? 'Save' : 'Saved';
   document.title = (dirty ? '● ' : '') + name + ' – Markline';
 }
 $('#fpath').addEventListener('click', function () {
@@ -309,6 +314,7 @@ function histShow(entry, caret) {
   dirty = currentMarkdown() !== cleanMd;
   updateStatus();
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 900);
+  scheduleAutoSave();
   updateCount();
 }
 function histGo(step) {
@@ -398,6 +404,8 @@ function histRender() {
 function histUi() {
   $('#bUndo').disabled = !(H.hi > 0 || histPending);
   $('#bRedo').disabled = !(H.hi < H.list.length - 1);
+  $('#editUndo').disabled = $('#bUndo').disabled;
+  $('#editRedo').disabled = $('#bRedo').disabled;
   histRender();
 }
 function toggleHist(on) {
@@ -422,7 +430,32 @@ function markDirty() {
   clearTimeout(histTimer); histTimer = setTimeout(histPush, 350);
   dirty = true; updateStatus();
   clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 900);
+  scheduleAutoSave();
   clearTimeout(countTimer); countTimer = setTimeout(updateCount, 300);
+}
+function scheduleAutoSave() {
+  clearTimeout(autoTimer);
+  if (prefs.autosave && dirty && hasTarget() && !autoSaving) autoTimer = setTimeout(autoSave, 1000);
+}
+async function autoSave() {
+  if (!prefs.autosave || !dirty || !hasTarget() || autoSaving) return;
+  const generation = docGeneration;
+  autoSaving = true; updateStatus();
+  let result = 'failed';
+  try {
+    result = await io.save(false, true);
+    if (generation !== docGeneration) return;
+    if (result === 'conflict') toast('Autosave paused: the file changed on disk. Reload it or use Save to keep your edits.');
+    else if (result === 'permission') toast('Autosave needs write access. Use Save once to grant access.');
+    else if (result === 'failed') toast('Autosave failed. Your edits are still here. Use Save to try again.');
+  } catch (e) {
+    if (generation === docGeneration) toast('Autosave failed. Your edits are still here. Use Save to try again.');
+  } finally {
+    if (generation === docGeneration) {
+      autoSaving = false; updateStatus();
+      if (result === 'file' && dirty) scheduleAutoSave();
+    }
+  }
 }
 function saveDraft() {
   try { localStorage.setItem(KEY, JSON.stringify({ name: name, md: currentMarkdown(), path: fileHandle && fileHandle.native || null, dirty: dirty })); } catch (e) { /* storage unavailable */ }
@@ -445,8 +478,9 @@ async function leave(fn) {
   if (dirty && currentMarkdown() === cleanMd) { dirty = false; updateStatus(); }
   if (!dirty || !hasTarget()) { guard(fn); return; }
   const prev = name;
-  const r = await io.save();
-  if (r === 'file') { afterSave(); toast('Saved ' + mdName(prev)); fn(); }
+  let r;
+  try { r = await io.save(); } catch (e) { r = 'failed'; }
+  if (r === 'file') { if (dirty) return leave(fn); toast('Saved ' + mdName(prev)); fn(); }
   else guard(fn);
 }
 
@@ -535,6 +569,7 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 function loadDoc(text, fname, handle) {
   const sc = $('#scroll');
   rememberCaret();
+  ++docGeneration; clearTimeout(autoTimer); autoSaving = false;
   mode = 'rendered';
   gitMarks = {}; gitKey = ''; ++gitGeneration; clearTimeout(gitTimer);
   setModeUi();
@@ -572,23 +607,57 @@ const io = {
     }
     $('#file').click();
   },
-  save: async function () {
+  // Serialize writes so an older autosave cannot overwrite a newer manual save.
+  save: function (saveAs, automatic) {
+    clearTimeout(autoTimer);
+    const generation = docGeneration;
+    const job = saveQueue.then(async function () {
+      if (generation !== docGeneration) return 'cancel';
+      if (automatic && (!prefs.autosave || !dirty || !hasTarget())) return 'cancel';
+      const md = currentMarkdown();
+      if (automatic && md === cleanMd) { dirty = false; updateStatus(); saveDraft(); return 'unchanged'; }
+      histPush();
+      const result = await io.write(saveAs, automatic);
+      if (generation !== docGeneration) return 'cancel';
+      if (result === 'file' || result === 'download') afterSave(md);
+      return result;
+    });
+    saveQueue = job.catch(function () { /* a failed write must not block later saves */ });
+    return job;
+  },
+  write: async function (saveAs, automatic) {
     const md = currentMarkdown();
+    const target = fileHandle, suggested = mdName(name), generation = docGeneration;
     if (TAURI) {
-      const res = await TAURI.invoke('save_file', { path: fileHandle && fileHandle.native || null, suggested: mdName(name), text: md });
+      const path = !saveAs && target && target.native || null;
+      if (automatic) {
+        if (!path) return 'cancel';
+        const file = await TAURI.invoke('read_file', { path: path });
+        if (generation !== docGeneration || !prefs.autosave) return 'cancel';
+        if (file.text !== diskText) return 'conflict';
+      }
+      const res = await TAURI.invoke('save_file', { path: path, suggested: suggested, text: md });
       if (!res) return 'cancel';
-      fileHandle = { native: res.path }; name = res.name;
+      if (generation === docGeneration) { fileHandle = { native: res.path }; name = res.name; }
       return 'file';
     }
-    if (fileHandle && fileHandle.createWritable) {
-      try { const w = await fileHandle.createWritable(); await w.write(md); await w.close(); return 'file'; }
-      catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
+    if (!saveAs && target && target.createWritable) {
+      try {
+        if (automatic) {
+          if (!target.queryPermission || await target.queryPermission({ mode: 'readwrite' }) !== 'granted') return 'permission';
+          const file = await target.getFile();
+          if (await file.text() !== diskText) return 'conflict';
+          if (generation !== docGeneration || !prefs.autosave) return 'cancel';
+        }
+        const w = await target.createWritable(); await w.write(md); await w.close(); return 'file';
+      } catch (e) { if (automatic) throw e; if (e && e.name === 'AbortError') return 'cancel'; }
     }
+    if (automatic) return 'cancel';
     if (window.showSaveFilePicker) {
       try {
         const h = await window.showSaveFilePicker({ suggestedName: mdName(name), types: MD_TYPES });
         const w = await h.createWritable(); await w.write(md); await w.close();
-        fileHandle = h; name = h.name || name;
+        if (generation === docGeneration) { fileHandle = h; name = h.name || name; }
         return 'file';
       } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; }
     }
@@ -600,14 +669,31 @@ const io = {
     try { await navigator.clipboard.writeText(md); return 'clipboard'; } catch (e) { return 'failed'; }
   }
 };
-function afterSave() {
-  markClean();
+function afterSave(md) {
+  diskText = cleanMd = md;
+  dirty = currentMarkdown() !== md;
+  if (mode === 'rendered' && !dirty) {
+    renderedLineText = md; renderedLineCanonical = md;
+  }
+  updateStatus(); saveDraft();
+  scheduleAutoSave();
+  numbers();
   if (window.syncActive) window.syncActive();
   if (window.onDocSaved) window.onDocSaved();
 }
-async function doSave() {
-  const r = await io.save();
-  if (r === 'file' || r === 'download') { afterSave(); toast('Saved ' + mdName(name)); }
+async function doSave(saveAs) {
+  histPush();
+  const previousKey = histKey();
+  let r;
+  try { r = await io.save(saveAs === true); } catch (e) { r = 'failed'; }
+  if (r === 'file' || r === 'download') {
+    const key = histKey();
+    if (key && key !== previousKey) {
+      H = { list: H.list.map(function (entry) { return Object.assign({}, entry); }), hi: H.hi };
+      histStore[key] = H;
+    }
+    toast('Saved ' + mdName(name));
+  }
   else if (r === 'clipboard') toast('Copied the markdown to your clipboard. This page cannot write files here.');
   else if (r === 'failed') toast('Could not save. Switch to Source and copy the text.');
 }
@@ -668,7 +754,11 @@ $('#bNew').addEventListener('click', function () {
   leave(function () { loadDoc('', 'untitled.md', null); doc.focus(); });
 });
 document.addEventListener('keydown', function (e) {
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); doSave(); }
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (key === 's') { e.preventDefault(); doSave(e.shiftKey); }
+  else if (!e.shiftKey && key === 'o') { e.preventDefault(); $('#bOpen').click(); }
+  else if (!e.shiftKey && key === 'n') { e.preventDefault(); $('#bNew').click(); }
 });
 
 /* ---------- settings: theme, text sizes, font, page width ---------- */
@@ -677,7 +767,7 @@ const ZKEY = 'markline-zoom-v1', WKEY = 'markline-width-v1', PKEY = 'markline-pr
 const WSTEPS = [['Narrow', '660px'], ['Default', '792px'], ['Wide', '980px'], ['Wider', '1200px'], ['Widest', '1500px'], ['Full', 'none']];
 const ZSTEPS = [0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 const FONTS = { sans: '', serif: "Georgia, 'Times New Roman', serif", mono: 'var(--font-mono)' };
-const PDEF = { ui: 1, code: 14, lh: 1.65, font: 'sans', nums: false, read: false };
+const PDEF = { ui: 1, code: 14, lh: 1.65, font: 'sans', nums: false, read: false, autosave: true };
 const rootStyle = document.documentElement.style;
 let theme = 'auto', zoom = 1, widx = 1, prefs = Object.assign({}, PDEF);
 try {
@@ -688,31 +778,37 @@ try {
 } catch (e) { /* defaults */ }
 function keep(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
 let gitMarks = {}, gitKey = '', gitTimer = null, gitGeneration = 0;
+function gutterMarkdown() {
+  if (mode === 'source') return srcEl.value;
+  const md = docToMarkdown();
+  return md === renderedLineCanonical ? renderedLineText : md;
+}
 function refreshGit(force) {
   const path = fileHandle && fileHandle.native;
-  const text = srcEl.value;
+  const text = gutterMarkdown();
   const key = path + '\0' + text;
   if (!force && key === gitKey) return;
   gitKey = key;
   const generation = ++gitGeneration;
   clearTimeout(gitTimer);
   if (!force) gitMarks = {};
-  if (!TAURI || !path || mode !== 'source') { gitMarks = {}; return; }
+  if (!TAURI || !path || !prefs.nums) { gitMarks = {}; return; }
   gitTimer = setTimeout(async function () {
     try {
       const hunks = await TAURI.invoke('git_changes', { path: path, text: text });
-      if (generation !== gitGeneration || mode !== 'source' || !fileHandle || fileHandle.native !== path || srcEl.value !== text) return;
+      if (generation !== gitGeneration || !fileHandle || fileHandle.native !== path || gutterMarkdown() !== text) return;
       gitMarks = gitMarkers(hunks, text.split('\n').length);
     } catch (e) { if (generation === gitGeneration) gitMarks = {}; }
     if (generation === gitGeneration) numbers();
   }, 250);
 }
 // Also pick up commits, index changes, and edits made outside this window.
-setInterval(function () { if (mode === 'source') refreshGit(true); }, 3000);
-window.addEventListener('focus', function () { if (mode === 'source') refreshGit(true); });
+setInterval(function () { if (prefs.nums) refreshGit(true); }, 3000);
+window.addEventListener('focus', function () { if (prefs.nums) refreshGit(true); });
 /* Source view gutter: an invisible copy of the text wraps like the textarea, so each number sits on its real markdown line */
 function numbers() {
   refreshGit(false);
+  if (mode === 'rendered') { renderedNumbers(); return; }
   if (mode !== 'source' || !$('#srcwrap').classList.contains('nums')) return;
   const inner = $('#srcnumin'), frag = document.createDocumentFragment();
   srcEl.value.split('\n').forEach(function (t, i) {
@@ -731,6 +827,48 @@ function numbers() {
 srcEl.addEventListener('input', numbers);
 srcEl.addEventListener('scroll', numbers);
 window.addEventListener('resize', numbers);
+function renderedNumbers() {
+  const gutter = $('#rendernum');
+  gutter.textContent = '';
+  if (!prefs.nums || mode !== 'rendered') return;
+  const md = gutterMarkdown(), fm = FM_RE.exec(md), head = fm ? fm[0] : '';
+  const offset = (head.match(/\n/g) || []).length;
+  const ranges = markdownSourceRanges(marked, md.slice(head.length), MARKED_OPTS).map(function (r) { return { start: r.start + offset, end: r.end + offset }; });
+  if (fm) ranges.unshift({ start: 1, end: offset || 1 });
+  const lineCount = md.split('\n').length;
+  const blocks = Array.from(doc.children).filter(function (el) { return !(el.nodeName === 'P' && el.innerHTML === '<br>'); });
+  // During an incomplete edit, omit labels rather than attach a line to the wrong block.
+  if (blocks.length !== ranges.length) return;
+  const box = $('#renderwrap').getBoundingClientRect(), scale = box.width / ($('#renderwrap').offsetWidth || 1);
+  const frag = document.createDocumentFragment();
+  blocks.forEach(function (block, i) {
+    const r = ranges[i], rect = block.getBoundingClientRect(), row = document.createElement('div');
+    row.className = 'render-line'; row.textContent = r.start;
+    row.dataset.start = r.start; row.dataset.end = r.end;
+    row.style.top = (rect.top - box.top) / scale + 'px';
+    row.style.height = Math.max(18, rect.height / scale) + 'px';
+    let added = false, modified = false;
+    const end = ranges[i + 1] ? ranges[i + 1].start - 1 : lineCount;
+    for (let line = i === 0 ? 1 : r.start; line <= end; line++) {
+      const marker = gitMarks[line];
+      if (!marker) continue;
+      added = added || marker.kind === 'added'; modified = modified || marker.kind === 'modified';
+      if (marker.deleted) row.classList.add('git-deleted-' + marker.deleted);
+    }
+    if (modified || added) row.classList.add(modified ? 'git-modified' : 'git-added');
+    frag.appendChild(row);
+  });
+  gutter.appendChild(frag);
+}
+let numbersFrame = 0;
+function scheduleNumbers() {
+  cancelAnimationFrame(numbersFrame);
+  numbersFrame = requestAnimationFrame(numbers);
+}
+new MutationObserver(scheduleNumbers).observe(doc, { subtree: true, childList: true, characterData: true });
+if (window.ResizeObserver) new ResizeObserver(scheduleNumbers).observe(doc);
+doc.addEventListener('input', scheduleNumbers);
+doc.addEventListener('load', scheduleNumbers, true);
 function setTheme(t) {
   theme = t;
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -771,7 +909,11 @@ function setPrefs(p) {
   $('#setFont').value = prefs.font;
   $('#setNums').checked = !!prefs.nums;
   $('#srcwrap').classList.toggle('nums', !!prefs.nums);
+  $('#renderwrap').classList.toggle('nums', !!prefs.nums);
+  gitKey = '';
   $('#setRead').checked = !!prefs.read;
+  $('#setAutosave').checked = !!prefs.autosave;
+  scheduleAutoSave();
   if (window.onReadPref) window.onReadPref(!!prefs.read);
   numbers();
   keep(PKEY, JSON.stringify(prefs));
@@ -784,6 +926,7 @@ $('#setCode').addEventListener('input', function (e) { setPrefs({ code: Number(e
 $('#setLh').addEventListener('input', function (e) { setPrefs({ lh: Number(e.target.value) }); });
 $('#setNums').addEventListener('change', function (e) { setPrefs({ nums: e.target.checked }); });
 $('#setRead').addEventListener('change', function (e) { setPrefs({ read: e.target.checked }); });
+$('#setAutosave').addEventListener('change', function (e) { setPrefs({ autosave: e.target.checked }); });
 $('#setFont').addEventListener('change', function (e) { setPrefs({ font: e.target.value }); });
 $('#setWidth').addEventListener('change', function (e) { setWidth(parseInt(e.target.value, 10)); });
 $('#setReset').addEventListener('click', function () { setTheme('auto'); setZoom(1); setWidth(1); setPrefs(PDEF); });
@@ -946,6 +1089,7 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
     root = p; open.clear(); lsSet(RKEY, p);
     render();
   }
+  window.openFolder = function () { setTab('files'); showPanel(true); return pickFolder(); };
   function drawOutline() {
     if (side.hidden || tab !== 'outline') return;
     outline.textContent = '';
@@ -1217,6 +1361,7 @@ function setModeUi() {
   $('#mR').setAttribute('aria-pressed', String(mode === 'rendered'));
   $('#mS').setAttribute('aria-pressed', String(mode === 'source'));
   doc.hidden = mode !== 'rendered';
+  $('#renderwrap').hidden = mode !== 'rendered';
   $('#srcwrap').hidden = mode !== 'source';
   $('#tools').classList.toggle('off', mode !== 'rendered');
   histUi();
@@ -1946,6 +2091,7 @@ async function reopenDraft() {
   if (!draft.dirty) { const f = await TAURI.invoke('read_file', { path: draft.path }); loadDoc(f.text, f.name, { native: f.path }); return; }
   loadDoc(draft.md, draft.name, { native: draft.path });
   dirty = true; cleanMd = null; updateStatus(); saveDraft();
+  scheduleAutoSave();
 }
 if (TAURI) TAURI.invoke('initial_file').then(function (f) {
   if (f) loadDoc(f.text, f.name, { native: f.path });

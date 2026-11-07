@@ -81,3 +81,25 @@ const post = '## Qual parada?\n\n' +
 test('raw HTML blocks survive a save untouched', () => {
   assert.equal(convert(render(post)).trim(), post.trim());
 });
+
+test('maps rendered blocks to source lines through blank lines and link definitions', () => {
+  const md = '# Title\r\n\r\n[a]: https://example.com\r\n\r\nParagraph [link][a].\r\nWrapped line.\r\n\r\n' +
+    '- First\r\n- Second\r\n\r\n```js\r\nlet n = 1;\r\n```\r\n';
+  assert.deepEqual(createMarkdownConverter.markdownSourceRanges(marked, md), [
+    { start: 1, end: 1 }, { start: 5, end: 6 }, { start: 8, end: 9 }, { start: 11, end: 13 }
+  ]);
+});
+
+test('maps raw HTML islands and tables as single rendered blocks', () => {
+  const md = '<figure>\n\n![Image](image.png)\n\n<figcaption>Caption</figcaption>\n\n</figure>\n\n' +
+    '| A | B |\n| --- | --- |\n| X | Y |\n\nLast paragraph.\n';
+  assert.deepEqual(createMarkdownConverter.markdownSourceRanges(marked, md), [
+    { start: 1, end: 7 }, { start: 9, end: 11 }, { start: 13, end: 13 }
+  ]);
+});
+
+test('source line mapping follows tab-indented code and nested lists', () => {
+  assert.deepEqual(createMarkdownConverter.markdownSourceRanges(marked, '\tcode\n\n- First\n\t- Nested\n\nEnd.\n'), [
+    { start: 1, end: 1 }, { start: 3, end: 4 }, { start: 6, end: 6 }
+  ]);
+});

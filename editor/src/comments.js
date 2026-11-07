@@ -329,7 +329,7 @@ async function load(quiet) {
   refreshHighlights(); renderList();
 }
 window.onDocLoaded = function () { comments = []; activeId = null; lastText = null; endCompose(); editingId = null; refreshHighlights(); renderList(); load(false); rebase(); dismissChanges(); };
-window.onDocSaved = function () { diskText = currentMarkdown(); if (comments.length) persist(); rebase(); };
+window.onDocSaved = function () { if (comments.length) persist(); rebase(); };
 window.addEventListener('focus', function () { if (TAURI && sidecarPath() && !pending && !editingId) load(true); });
 
 /* ---------- export ---------- */
@@ -375,7 +375,6 @@ $('#cWrite').addEventListener('click', async function () {
   if (!openCount()) { toast('No open comments to send.'); return; }
   const r = await io.save();
   if (r !== 'file') { toast(r === 'cancel' ? 'Cancelled.' : 'Saving to a file needs the desktop app.'); return; }
-  markClean();
   await persist();
   toast('Saved ' + mdName(name) + ' and ' + mdName(name) + '.comments.json. In Copilot, run the apply-comments prompt.');
   renderList();
@@ -536,7 +535,6 @@ if (TAURI) {
     if (!openCount()) { toast('No open comments to send.'); return; }
     const r = await io.save();
     if (r !== 'file') { toast(r === 'cancel' ? 'Cancelled.' : 'Could not save the file.'); return; }
-    markClean();
     await persist();
     try {
       const res = await TAURI.invoke('send_batch', { path: fileHandle.native });

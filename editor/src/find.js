@@ -7,11 +7,21 @@ function findMatches(text, query) {
   while ((m = pattern.exec(text))) matches.push({ start: m.index, end: m.index + m[0].length });
   return matches;
 }
-if (typeof module !== 'undefined') module.exports = { findMatches };
+function replaceMatches(text, matches, replacement) {
+  let end = 0, result = '';
+  matches.forEach(function (m) {
+    result += text.slice(end, m.start) + replacement;
+    end = m.end;
+  });
+  return result + text.slice(end);
+}
+if (typeof module !== 'undefined') module.exports = { findMatches, replaceMatches };
 
 if (typeof document !== 'undefined') (function () {
   const bar = $('#findbar'), input = $('#findQuery'), status = $('#findStatus');
   const prev = $('#findPrev'), next = $('#findNext');
+  const replaceRow = $('#replaceRow'), replacement = $('#replaceText');
+  const replaceOne = $('#replaceOne'), replaceAll = $('#replaceAll');
   let matches = [], ranges = [], active = -1, cache = '', timer = null;
   const sourceLayer = document.createElement('div'), sourceMirror = document.createElement('div');
   sourceLayer.id = 'findSource'; sourceLayer.hidden = true; sourceLayer.setAttribute('aria-hidden', 'true');
@@ -87,6 +97,7 @@ if (typeof document !== 'undefined') (function () {
     if (step && matches.length) active = (active + step + matches.length) % matches.length;
     status.textContent = !input.value ? 'Type to search' : matches.length ? (active + 1) + ' of ' + matches.length : 'No matches';
     prev.disabled = next.disabled = !matches.length;
+    replaceOne.disabled = replaceAll.disabled = mode !== 'source' || !matches.length;
     input.setAttribute('aria-invalid', String(!!input.value && !matches.length));
     paintSource();
     if (active < 0) return;
@@ -105,7 +116,7 @@ if (typeof document !== 'undefined') (function () {
       }
     }
   }
-  function open() {
+  function open(replacing) {
     let selected = '';
     if (mode === 'source' && document.activeElement === srcEl) selected = srcEl.value.slice(srcEl.selectionStart, srcEl.selectionEnd);
     else {
@@ -113,10 +124,43 @@ if (typeof document !== 'undefined') (function () {
       if (sel.rangeCount && doc.contains(sel.anchorNode) && doc.contains(sel.focusNode)) selected = sel.toString();
     }
     if (selected && !selected.includes('\n')) input.value = selected;
+    const showReplace = replacing === true;
+    if (showReplace && mode !== 'source') {
+      // Keep the original source on an untouched rendered page, including its spacing.
+      const md = gutterMarkdown(), wasClean = !dirty;
+      setMode('source'); srcEl.value = md; numbers(); histPush();
+      if (wasClean) cleanMd = md;
+    }
+    replaceRow.hidden = !showReplace;
+    $('#findReplace').setAttribute('aria-expanded', String(showReplace));
+    $('#findReplace').classList.toggle('on', showReplace);
     bar.hidden = false; $('#bFind').setAttribute('aria-expanded', 'true');
     active = -1; cache = ''; update(true, 0, true);
     input.focus(); input.select();
     clearInterval(timer); timer = setInterval(function () { update(false); }, 300);
+  }
+  function replace(all) {
+    if (mode !== 'source') return;
+    update(false);
+    if (active < 0) return;
+    const chosen = all ? matches.slice() : [matches[active]];
+    const value = srcEl.value, pos = chosen[0].start + replacement.value.length;
+    const result = replaceMatches(value, chosen, replacement.value);
+    if (result === value) { update(true, 1); return; }
+    histPush();
+    pendingBeforeCaret = { srcStart: chosen[0].start, srcEnd: chosen[0].end };
+    srcEl.value = result;
+    srcEl.setSelectionRange(pos, pos);
+    srcEl.dispatchEvent(new Event('input', { bubbles: true }));
+    histPush();
+    // Skip the newly inserted text, even when it contains the search query.
+    cache = ''; active = -1; update(false, 0, true);
+    if (matches.length) {
+      const i = matches.findIndex(function (m) { return m.start >= pos; });
+      active = i < 0 ? 0 : i;
+    }
+    update(true);
+    toast('Replaced ' + chosen.length + (chosen.length === 1 ? ' match.' : ' matches.'));
   }
   function close() {
     bar.hidden = true; $('#bFind').setAttribute('aria-expanded', 'false');
@@ -128,17 +172,32 @@ if (typeof document !== 'undefined') (function () {
     }
   }
   $('#bFind').addEventListener('click', open);
+  $('#findReplace').addEventListener('click', function () {
+    if (replaceRow.hidden) open(true);
+    else { replaceRow.hidden = true; $('#findReplace').setAttribute('aria-expanded', 'false'); $('#findReplace').classList.remove('on'); input.focus(); }
+  });
+  replaceOne.addEventListener('click', function () { replace(false); });
+  replaceAll.addEventListener('click', function () { replace(true); });
   $('#findClose').addEventListener('click', close);
   input.addEventListener('input', function () { active = -1; cache = ''; update(true); });
   prev.addEventListener('click', function () { update(true, -1); });
   next.addEventListener('click', function () { update(true, 1); });
   new MutationObserver(function () { if (!bar.hidden) update(false, 0, true); }).observe(doc, { subtree: true, childList: true, characterData: true });
+  const previousLoaded = window.onDocLoaded;
+  window.onDocLoaded = function () {
+    if (previousLoaded) previousLoaded();
+    if (!bar.hidden) open(!replaceRow.hidden);
+  };
   document.addEventListener('keydown', function (e) {
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'f') {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'h') {
+      e.preventDefault(); open(true);
+    } else if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'f') {
       e.preventDefault(); open();
     } else if (!bar.hidden && e.key === 'Escape') {
       e.preventDefault(); e.stopImmediatePropagation(); close();
-    } else if (!bar.hidden && (e.key === 'F3' || (bar.contains(e.target) && e.key === 'Enter'))) {
+    } else if (!bar.hidden && e.target === replacement && e.key === 'Enter') {
+      e.preventDefault(); replace(e.ctrlKey || e.metaKey);
+    } else if (!bar.hidden && (e.key === 'F3' || (e.target === input && e.key === 'Enter'))) {
       e.preventDefault(); update(true, e.shiftKey ? -1 : 1);
     }
   }, true);

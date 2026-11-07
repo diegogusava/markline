@@ -85,16 +85,20 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); fon
 /* toolbar */
 .bar { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
 .row1, .row2 { display: flex; align-items: center; }
-.row1 { min-height: 50px; gap: 10px; }
+.row1 { min-height: 64px; gap: 10px; padding-block: 6px; }
 .row2 { min-height: 42px; gap: 2px; flex-wrap: wrap; border-top: 1px solid var(--border); }
-.file { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.filehead { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 240px; }
+.menubar { display: flex; align-items: center; gap: 2px; }
+.menubar > .dmenu > summary { height: 28px; padding-inline: 8px; }
+.file { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 10px; padding-left: 8px; min-width: 0; line-height: 1.25; }
+.file > .dot, .file > .btn { flex: none; }
 .brand { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: var(--accent); color: var(--accent-fg); flex: none; }
 .ic { display: block; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .grp { display: inline-flex; align-items: center; gap: 2px; padding-left: 8px; border-left: 1px solid var(--border); }
-.fnames { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.file span#fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+.file span#fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; min-width: 0; }
+.file:has(#fpath:not([hidden])) #fname { max-width: 45%; }
 /* the full path, cut at the start so the folder and file name stay visible */
-#fpath { font-size: 11px; font-weight: 400; color: var(--muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; direction: rtl; text-align: left; cursor: pointer; }
+#fpath { font-size: 12px; font-weight: 400; color: var(--muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; direction: rtl; text-align: left; cursor: pointer; }
 #fpath:hover { color: var(--fg); }
 #fpath[hidden] { display: none; }
 .dot { font-size: 11px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); white-space: nowrap; }
@@ -214,7 +218,7 @@ figure.mm.sel .mm-insp { display: flex; }
 @media (max-width: 700px) {
   #scroll > .wrap { padding: 0; }
   #doc, #srcwrap { --pt: 22px; border: 0; border-radius: 0; box-shadow: none; padding-inline: 16px; }
-  .seg span, #bCom span:not(.badge), #bNotes span:not(.ndot), #bRead span, .brand { display: none; }
+  .seg span, #bCom span:not(.badge), #bNotes span:not(.ndot), #bRead span { display: none; }
   .row1 { gap: 6px; }
   .grp { padding-left: 4px; }
   .row2 { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-inline: 8px; }
@@ -224,13 +228,11 @@ figure.mm.sel .mm-insp { display: flex; }
   #doc th { white-space: nowrap; }
 }
 @media (max-width: 560px) {
-  #bHist, .grp:has(#bNew), #bSave:not(.primary), .row1 > .grow { display: none; }
-  .file { flex: 1; }
+  #bHist, .grp:has(#bNew), #bSave:not(.primary) { display: none; }
   .seg button { padding: 4px 8px; }
 }
 @media (max-width: 560px) {
   #doc h1 { font-size: 26px; }
-  .file span#fname, #fpath { max-width: 30vw; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .btn, figure.mm { transition: background .12s, border-color .12s, box-shadow .12s; }
@@ -265,7 +267,18 @@ figure.mm.sel .mm-insp { display: flex; }
 .mm-insp .f.grow { flex: 1 1 320px; }
 .btn.sm.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .grp-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); align-self: center; }
-#doc, #srcwrap { zoom: var(--zoom, 1); }
+#renderwrap, #srcwrap { zoom: var(--zoom, 1); }
+#renderwrap { position: relative; }
+#renderwrap[hidden] { display: none; }
+#renderwrap.nums #doc { padding-left: max(4.25em, 7%); }
+#rendernum { position: absolute; inset: 0 auto 0 8px; width: 42px; pointer-events: none; user-select: none; }
+#renderwrap:not(.nums) #rendernum { display: none; }
+.render-line { position: absolute; width: 100%; padding-left: 6px; text-align: right; color: var(--muted); font: 12px/18px var(--font-mono); font-variant-numeric: tabular-nums; }
+.render-line.git-added { border-left: 3px solid #299647; }
+.render-line.git-modified { border-left: 3px solid #398bd4; }
+.render-line.git-deleted-before::after, .render-line.git-deleted-after::after { content: ''; position: absolute; left: -3px; border-left: 7px solid #e05252; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.render-line.git-deleted-before::after { top: -4px; }
+.render-line.git-deleted-after::after { bottom: -4px; }
 #srcwrap { position: relative; }
 #srcnum { display: none; position: absolute; inset: 0; padding: inherit; clip-path: inset(var(--pt) 0 var(--pb) 0); overflow: hidden; pointer-events: none; user-select: none; }
 #srcwrap.nums #srcnum { display: block; }
@@ -444,8 +457,25 @@ body.resizing { cursor: col-resize; user-select: none; }
 .shurl code { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; background: none; }
 #findbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 8px; border-top: 1px solid var(--border); }
 #findbar[hidden] { display: none; }
-#findQuery { flex: 1; min-width: 100px; width: 180px; font: inherit; color: var(--fg); background: var(--page); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 8px; }
-#findQuery::placeholder { color: var(--muted); }
+#findQuery, #replaceText { flex: 1; min-width: 100px; width: 180px; font: inherit; color: var(--fg); background: var(--page); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 8px; }
+#findQuery::placeholder, #replaceText::placeholder { color: var(--muted); }
+#replaceRow { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+#replaceRow[hidden] { display: none; }
+#replaceHint { flex-basis: 100%; color: var(--muted); font-size: 12px; }
+.app-menu .dmenu-list { min-width: 240px; }
+.app-menu .dmenu-list button { flex-direction: row; justify-content: space-between; align-items: center; gap: 24px; }
+.app-menu kbd { font: 12px var(--font-ui); color: var(--muted); white-space: nowrap; }
+.app-menu hr { width: 100%; border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+@media (max-width: 1024px) {
+  .row1 { flex-wrap: wrap; }
+  .filehead { flex-basis: calc(100% - 40px); }
+}
+@media (max-width: 700px) {
+  .app-menu .dmenu-list { position: absolute; left: 0; right: auto; top: calc(100% + 4px); }
+  #renderwrap.nums #doc { padding-left: 60px; }
+  #rendernum { left: 4px; width: 40px; }
+  .row1 { flex-wrap: wrap; padding-block: 6px; }
+}
 #findStatus { font-size: 12px; font-variant-numeric: tabular-nums; }
 #findSource { position: absolute; overflow: hidden; pointer-events: none; user-select: none; }
 #findSource[hidden] { display: none; }
@@ -487,8 +517,34 @@ body.resizing { cursor: col-resize; user-select: none; }
 <div id="app">
   <header class="bar">
     <div class="wrap row1">
-      <div class="file"><span class="brand" title="Markline __VERSION__"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-logo"/></svg></span><span class="fnames"><span id="fname">sample.md</span><span id="fpath" hidden></span></span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
-      <div class="grow"></div>
+      <span class="brand" title="Markline __VERSION__" aria-label="Markline"><svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-logo"/></svg></span>
+      <div class="filehead">
+        <div class="menubar" aria-label="Application menus">
+          <details class="dmenu app-menu" id="fileMenu">
+            <summary class="btn ghost" aria-label="File menu">File</summary>
+            <div class="dmenu-list">
+              <button type="button" data-file-action="new"><span>New file</span><kbd>Ctrl+N</kbd></button>
+              <button type="button" data-file-action="open"><span>Open file…</span><kbd>Ctrl+O</kbd></button>
+              <button type="button" data-file-action="folder" id="menuOpenFolder"><span>Open folder…</span></button>
+              <hr>
+              <button type="button" data-file-action="save"><span>Save</span><kbd>Ctrl+S</kbd></button>
+              <button type="button" data-file-action="saveAs"><span>Save as…</span><kbd>Ctrl+Shift+S</kbd></button>
+            </div>
+          </details>
+          <details class="dmenu app-menu" id="editMenu">
+            <summary class="btn ghost" aria-label="Edit menu">Edit</summary>
+            <div class="dmenu-list">
+              <button type="button" data-edit-action="undo" id="editUndo" disabled><span>Undo</span><kbd>Ctrl+Z</kbd></button>
+              <button type="button" data-edit-action="redo" id="editRedo" disabled><span>Redo</span><kbd>Ctrl+Shift+Z</kbd></button>
+              <button type="button" data-edit-action="history"><span>History…</span></button>
+              <hr>
+              <button type="button" data-edit-action="find"><span>Find…</span><kbd>Ctrl+F</kbd></button>
+              <button type="button" data-edit-action="replace"><span>Replace…</span><kbd>Ctrl+H</kbd></button>
+            </div>
+          </details>
+        </div>
+        <div class="file"><span id="fname">sample.md</span><span id="fpath" hidden></span><span id="dot" class="dot" hidden title="This file has changes that are not saved yet. They are saved automatically when you open another file.">Unsaved</span><button type="button" class="btn sm" id="cDiff" hidden title="Show what changed on disk">Changes</button></div>
+      </div>
       <div class="seg" role="group" aria-label="View">
         <button type="button" id="mR" class="on" aria-pressed="true"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-eye"/></svg><span>Rendered</span></button>
         <button type="button" id="mS" aria-pressed="false"><svg class="ic" width="14" height="14" aria-hidden="true"><use href="#i-md"/></svg><span>Source</span></button>
@@ -555,7 +611,15 @@ body.resizing { cursor: col-resize; user-select: none; }
       <span id="findStatus" role="status" aria-live="polite"></span>
       <button class="btn sm" id="findPrev" type="button" title="Previous match (Shift+Enter)" disabled>Previous</button>
       <button class="btn sm" id="findNext" type="button" title="Next match (Enter)" disabled>Next</button>
+      <button class="btn sm" id="findReplace" type="button" title="Find and replace (Ctrl+H)" aria-controls="replaceRow" aria-expanded="false">Replace…</button>
       <button class="btn sm" id="findClose" type="button" title="Close search (Escape)">Close</button>
+      <div id="replaceRow" hidden>
+        <label for="replaceText">Replace with</label>
+        <input id="replaceText" type="text" placeholder="Replacement text" autocomplete="off" spellcheck="false" aria-describedby="replaceHint">
+        <button class="btn sm" id="replaceOne" type="button" disabled>Replace</button>
+        <button class="btn sm" id="replaceAll" type="button" disabled>Replace all</button>
+        <span id="replaceHint">Replace edits the Markdown source. Search is literal and ignores case.</span>
+      </div>
     </div>
     <div class="wrap" id="confirm" hidden>
       <span id="confirmText"></span>
@@ -581,7 +645,7 @@ body.resizing { cursor: col-resize; user-select: none; }
     </aside>
     <main id="scroll">
       <div class="wrap">
-        <div id="doc" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document" spellcheck="true"></div>
+        <div id="renderwrap"><div id="doc" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Document" spellcheck="true"></div><div id="rendernum" aria-hidden="true"></div></div>
         <div id="srcwrap" hidden><div id="srcnum" aria-hidden="true"><div id="srcnumin"></div></div><textarea id="src" spellcheck="false" aria-label="Markdown source"></textarea></div>
       </div>
     </main>
@@ -676,13 +740,14 @@ body.resizing { cursor: col-resize; user-select: none; }
 <div id="settings" hidden role="dialog" aria-label="Settings">
   <div class="side-head"><span class="side-name">Settings</span><button type="button" class="btn sm" id="setClose" aria-label="Close">&times;</button></div>
   <div class="cbody">
+    <label class="shrow"><span class="rl">Auto save</span><input type="checkbox" id="setAutosave"> <span>save existing files after 1 second of inactivity</span></label>
     <label class="shrow"><span class="rl">Theme</span><select id="setTheme"><option value="auto">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
     <label class="shrow"><span class="rl">Document text</span><input type="range" id="setText" min="60" max="300" step="5"><output id="setTextV"></output></label>
     <label class="shrow"><span class="rl">Interface text</span><input type="range" id="setUi" min="80" max="150" step="5"><output id="setUiV"></output></label>
     <label class="shrow"><span class="rl">Code text</span><input type="range" id="setCode" min="11" max="22" step="1"><output id="setCodeV"></output></label>
     <label class="shrow"><span class="rl">Line spacing</span><input type="range" id="setLh" min="1.3" max="2" step="0.05"><output id="setLhV"></output></label>
     <label class="shrow"><span class="rl">Document font</span><select id="setFont"><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option></select></label>
-    <label class="shrow"><span class="rl">Line numbers</span><input type="checkbox" id="setNums"> <span>in Source view (Git: green added, blue edited, red deleted)</span></label>
+    <label class="shrow"><span class="rl">Line numbers</span><input type="checkbox" id="setNums"> <span>both views; Rendered labels each block’s starting source line. Git: green added, blue edited, red deleted.</span></label>
     <label class="shrow" title="Hemingway-style checks: hard sentences, adverbs, passive voice and complex phrases"><span class="rl">Readability</span><input type="checkbox" id="setRead"> <span>show the tool</span></label>
     <label class="shrow"><span class="rl">Page width</span><select id="setWidth"></select></label>
     <div class="cactions"><button type="button" class="btn sm" id="setReset">Reset to defaults</button></div>
