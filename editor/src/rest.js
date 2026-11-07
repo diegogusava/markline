@@ -536,6 +536,7 @@ function loadDoc(text, fname, handle) {
   const sc = $('#scroll');
   rememberCaret();
   mode = 'rendered';
+  gitMarks = {}; gitKey = ''; ++gitGeneration; clearTimeout(gitTimer);
   setModeUi();
   name = fname || 'untitled.md';
   fileHandle = handle || null;
@@ -686,12 +687,42 @@ try {
   Object.assign(prefs, JSON.parse(localStorage.getItem(PKEY) || '{}'));
 } catch (e) { /* defaults */ }
 function keep(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+let gitMarks = {}, gitKey = '', gitTimer = null, gitGeneration = 0;
+function refreshGit(force) {
+  const path = fileHandle && fileHandle.native;
+  const text = srcEl.value;
+  const key = path + '\0' + text;
+  if (!force && key === gitKey) return;
+  gitKey = key;
+  const generation = ++gitGeneration;
+  clearTimeout(gitTimer);
+  if (!force) gitMarks = {};
+  if (!TAURI || !path || mode !== 'source') { gitMarks = {}; return; }
+  gitTimer = setTimeout(async function () {
+    try {
+      const hunks = await TAURI.invoke('git_changes', { path: path, text: text });
+      if (generation !== gitGeneration || mode !== 'source' || !fileHandle || fileHandle.native !== path || srcEl.value !== text) return;
+      gitMarks = gitMarkers(hunks, text.split('\n').length);
+    } catch (e) { if (generation === gitGeneration) gitMarks = {}; }
+    if (generation === gitGeneration) numbers();
+  }, 250);
+}
+// Also pick up commits, index changes, and edits made outside this window.
+setInterval(function () { if (mode === 'source') refreshGit(true); }, 3000);
+window.addEventListener('focus', function () { if (mode === 'source') refreshGit(true); });
 /* Source view gutter: an invisible copy of the text wraps like the textarea, so each number sits on its real markdown line */
 function numbers() {
+  refreshGit(false);
   if (mode !== 'source' || !$('#srcwrap').classList.contains('nums')) return;
   const inner = $('#srcnumin'), frag = document.createDocumentFragment();
   srcEl.value.split('\n').forEach(function (t, i) {
-    const d = document.createElement('div'); d.dataset.n = String(i + 1); d.textContent = t || ' '; frag.appendChild(d);
+    const d = document.createElement('div'); d.dataset.n = String(i + 1); d.textContent = t || ' ';
+    const marker = gitMarks[i + 1];
+    if (marker) {
+      if (marker.kind) d.classList.add('git-' + marker.kind);
+      if (marker.deleted) d.classList.add('git-deleted-' + marker.deleted);
+    }
+    frag.appendChild(d);
   });
   inner.textContent = ''; inner.appendChild(frag);
   inner.style.width = srcEl.clientWidth + 'px';
@@ -1159,7 +1190,7 @@ function setMode(next) {
     const md = docToMarkdown();
     let c = null;
     try { c = renderedCaret(md); } catch (e) { c = null; }
-    srcEl.value = md; mode = 'source'; setModeUi(); numbers();
+    srcEl.value = md; mode = 'source'; gitKey = ''; setModeUi(); numbers();
     srcEl.focus({ preventScroll: true });
     if (c) { srcEl.setSelectionRange(c.s, c.e); scrollSrcTo(c.s, c.y); }
   } else {

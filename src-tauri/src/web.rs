@@ -244,6 +244,12 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
             let text = std::fs::read_to_string(&f).map_err(|e| E(500, e.to_string()))?;
             Ok(json!({"path": f.to_string_lossy(), "name": name_of(&f), "text": text}))
         }
+        "git_changes" => {
+            let f = resolve(&st.root, &path("path"), false)?;
+            if !is_text(&f) { return fail(403, "Not allowed"); }
+            let text = a.get("text").and_then(|v| v.as_str()).ok_or_else(|| E(400, "text required".into()))?;
+            Ok(json!(crate::git::changes(&f, text)))
+        }
         "read_optional" => {
             let f = resolve(&st.root, &path("path"), true)?;
             if !is_sidecar(&f) && !is_text(&f) { return fail(403, "Not allowed"); }

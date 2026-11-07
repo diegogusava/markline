@@ -273,6 +273,12 @@ figure.mm.sel .mm-insp { display: flex; }
 #srcnumin { font-family: var(--font-mono); font-size: var(--code, 14px); line-height: var(--lh, 1.65); padding-left: 3.6em; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
 #srcnumin div { position: relative; color: transparent; }
 #srcnumin div::before { content: attr(data-n); position: absolute; left: -3.6em; width: 3em; text-align: right; color: var(--muted); }
+#srcnumin div.git-added::before { border-left: 3px solid #299647; }
+#srcnumin div.git-modified::before { border-left: 3px solid #398bd4; }
+#srcnumin div.git-deleted-before::after, #srcnumin div.git-deleted-after::after { content: ''; position: absolute; left: -3.6em; border-left: 7px solid #e05252; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+#srcnumin div.git-deleted-before::after { top: -4px; }
+#srcnumin div.git-deleted-after::after { bottom: -4px; }
+
 .bar, #rail, #side, #cpanel, #npanel, .status, #sharebox, #settings, #histbox { zoom: var(--uizoom, 1); }
 .body { flex: 1; min-height: 0; display: flex; }
 #scroll { flex: 1; min-width: 0; }
@@ -651,7 +657,7 @@ body.resizing { cursor: col-resize; user-select: none; }
     <label class="shrow"><span class="rl">Code text</span><input type="range" id="setCode" min="11" max="22" step="1"><output id="setCodeV"></output></label>
     <label class="shrow"><span class="rl">Line spacing</span><input type="range" id="setLh" min="1.3" max="2" step="0.05"><output id="setLhV"></output></label>
     <label class="shrow"><span class="rl">Document font</span><select id="setFont"><option value="sans">Sans</option><option value="serif">Serif</option><option value="mono">Mono</option></select></label>
-    <label class="shrow"><span class="rl">Line numbers</span><input type="checkbox" id="setNums"> <span>in Source view</span></label>
+    <label class="shrow"><span class="rl">Line numbers</span><input type="checkbox" id="setNums"> <span>in Source view (Git: green added, blue edited, red deleted)</span></label>
     <label class="shrow" title="Hemingway-style checks: hard sentences, adverbs, passive voice and complex phrases"><span class="rl">Readability</span><input type="checkbox" id="setRead"> <span>show the tool</span></label>
     <label class="shrow"><span class="rl">Page width</span><select id="setWidth"></select></label>
     <div class="cactions"><button type="button" class="btn sm" id="setReset">Reset to defaults</button></div>

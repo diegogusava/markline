@@ -6,6 +6,7 @@ A Markdown editor for people who review documents with a coding agent. You write
 
 ## What it does
 
+- **See Git changes in Source view.** With line numbers enabled, the gutter marks added lines in green, edited lines in blue, and deletions in red. Changes include unsaved edits and compare against the last commit (HEAD). New files appear as additions. Git must be installed; ignored files and files outside a repository have no markers.
 - **Write in the rendered view.** Headings, lists, tables, code and front matter are edited in place, and saved as plain Markdown. Switch to **Source** at any time: the caret keeps its place in the text and on the screen.
 - **Edit Mermaid diagrams visually.** Flowcharts, architecture diagrams with groups, ER schemas and class diagrams. Click a node to rename it, change its shape or connect it. **Code** shows the Mermaid text.
 - **Review with an agent.** Select text, add a comment, press **Send to agent**. The agent runs `markline poll`, edits the file and runs `markline reply`. Each reply shows under its comment, and clicking the comment jumps to the changed text.

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod cli;
+mod git;
 mod web;
 use serde::Serialize;
 use std::path::Path;
@@ -89,6 +90,11 @@ fn list_dir(path: String) -> Result<Vec<Entry>, String> {
 fn read_file(path: String) -> Result<Opened, String> { read(Path::new(&path)) }
 
 #[tauri::command]
+async fn git_changes(path: String, text: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || git::changes(Path::new(&path), &text)).await.ok().flatten()
+}
+
+#[tauri::command]
 fn read_optional(path: String) -> Result<Option<String>, String> {
     match std::fs::read_to_string(&path) {
         Ok(t) => Ok(Some(t)),
@@ -170,7 +176,7 @@ fn main() {
     tauri::Builder::default()
         .manage(web::Web::default())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, delete_notes, stat, web_start, web_stop, web_status, send_batch, open_url])
+        .invoke_handler(tauri::generate_handler![open_file, save_file, initial_file, initial_folder, pick_folder, list_dir, read_file, read_optional, git_changes, delete_notes, stat, web_start, web_stop, web_status, send_batch, open_url])
         .run(tauri::generate_context!())
         .expect("error while running Markline");
 }
