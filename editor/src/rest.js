@@ -814,7 +814,8 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
   if (!TAURI) return;
   const side = $('#side'), tree = $('#tree'), rail = $('#rail');
   const RKEY = 'markline-folder-v1', OKEY = 'markline-panel-v1';
-  let root = null, tab = 'files', outTimer = null;
+  let root = null, tab = 'files', outTimer = null, searchTimer = null, generation = 0;
+  const search = $('#folderSearch');
   const open = new Set(), outline = $('#outline'), TKEY = 'markline-tab-v1';
   rail.hidden = false;
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -863,12 +864,28 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
   window.syncActive = function () {
     if (!side.hidden && tab === 'files' && followFile()) render(); else syncActive();
   };
-  async function fill(ul, path) {
+  async function fill(ul, path, query, version) {
     ul.innerHTML = '';
     let items;
     try { items = await TAURI.invoke('list_dir', { path: path }); }
-    catch (e) { const d = document.createElement('div'); d.className = 'err'; d.textContent = 'Cannot read this folder'; ul.appendChild(d); return; }
-    if (!items.length) { const d = document.createElement('div'); d.className = 'err'; d.textContent = path === root ? 'No markdown files here' : '(empty)'; d.style.color = 'var(--muted)'; ul.appendChild(d); }
+    catch (e) { if (version !== generation) return; const d = document.createElement('div'); d.className = 'err'; d.textContent = 'Cannot read this folder'; ul.appendChild(d); return; }
+    if (version !== generation) return;
+    if (query) {
+      const matches = [];
+      for (const it of items) {
+        if (version !== generation) return;
+        let children = null;
+        if (it.is_dir && !it.is_symlink) {
+          children = document.createElement('ul');
+          await fill(children, it.path, query, version);
+        }
+        if (it.name.toLowerCase().includes(query) || (children && children.querySelector('.row'))) {
+          matches.push(Object.assign({}, it, { children: children }));
+        }
+      }
+      items = matches;
+    }
+    if (!query && !items.length) { const d = document.createElement('div'); d.className = 'err'; d.textContent = path === root ? 'No markdown files here' : '(empty)'; d.style.color = 'var(--muted)'; ul.appendChild(d); }
     items.forEach(function (it) {
       const li = document.createElement('li');
       const row = document.createElement('div');
@@ -876,16 +893,19 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
       row.dataset.path = it.path;
       row.setAttribute('role', 'treeitem');
       row.title = it.path;
-      row.innerHTML = '<span class="tic">' + (it.is_dir ? (open.has(it.path) ? '&#9662;' : '&#9656;') : '<svg class="ic" width="14" height="14"><use href="#i-file"/></svg>') + '</span><span class="nm"></span>';
+      row.innerHTML = '<span class="tic">' + (it.is_dir ? ((query || open.has(it.path)) ? '&#9662;' : '&#9656;') : '<svg class="ic" width="14" height="14"><use href="#i-file"/></svg>') + '</span><span class="nm"></span>';
       row.querySelector('.nm').textContent = it.name;
       li.appendChild(row);
       if (it.is_dir) {
-        const sub = document.createElement('ul');
+        const sub = it.children || document.createElement('ul');
         li.appendChild(sub);
-        if (open.has(it.path)) fill(sub, it.path).then(syncActive);
+        if (!query && open.has(it.path)) fill(sub, it.path, '', version).then(syncActive);
+        row.setAttribute('aria-expanded', String(!!query || open.has(it.path)));
         row.addEventListener('click', function () {
+          if (query) { sub.hidden = !sub.hidden; row.setAttribute('aria-expanded', String(!sub.hidden)); row.querySelector('.tic').innerHTML = sub.hidden ? '&#9656;' : '&#9662;'; return; }
+          row.setAttribute('aria-expanded', String(!open.has(it.path)));
           if (open.has(it.path)) { open.delete(it.path); sub.innerHTML = ''; row.querySelector('.tic').innerHTML = '&#9656;'; }
-          else { open.add(it.path); row.querySelector('.tic').innerHTML = '&#9662;'; fill(sub, it.path).then(syncActive); }
+          else { open.add(it.path); row.querySelector('.tic').innerHTML = '&#9662;'; fill(sub, it.path, '', version).then(syncActive); }
         });
       } else {
         row.addEventListener('click', function () {
@@ -900,13 +920,23 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
     });
   }
   async function render() {
+    const version = ++generation, query = search.value.trim().toLowerCase();
     tree.innerHTML = '';
     if (!root) { tree.innerHTML = '<div class="empty">No folder open.<br>Click <b>Open&hellip;</b> to choose one.</div>'; $('#sideName').textContent = 'Folder'; $('#sideName').title = ''; return; }
     $('#sideName').textContent = base(root);
     $('#sideName').title = root;
     const ul = document.createElement('ul');
     tree.appendChild(ul);
-    await fill(ul, root);
+    if (query) tree.setAttribute('aria-busy', 'true');
+    else tree.removeAttribute('aria-busy');
+    await fill(ul, root, query, version);
+    if (version !== generation) return;
+    tree.removeAttribute('aria-busy');
+    if (query && !ul.children.length) {
+      const note = document.createElement('div');
+      note.className = 'empty'; note.textContent = 'No matching files or folders';
+      ul.appendChild(note);
+    }
     syncActive();
   }
   async function pickFolder() {
@@ -939,7 +969,7 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
   function setTab(next) {
     tab = next; lsSet(TKEY, next);
     const files = next === 'files';
-    tree.hidden = !files; outline.hidden = files;
+    tree.hidden = !files; outline.hidden = files; search.hidden = !files;
     $('#sideOpen').hidden = $('#sideRefresh').hidden = !files;
     $('#sideName').textContent = files ? (root ? base(root) : 'Folder') : 'Outline';
     $('#sideName').title = files && root || '';
@@ -963,6 +993,14 @@ setTheme(theme); setZoom(zoom); setWidth(widx); setPrefs({});
     .observe(doc, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
   $('#sideOpen').addEventListener('click', pickFolder);
   $('#sideRefresh').addEventListener('click', render);
+  search.addEventListener('input', function () {
+    ++generation;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(render, 200);
+  });
+  search.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { search.value = ''; clearTimeout(searchTimer); render(); }
+  });
   $('#sideClose').addEventListener('click', function () { showPanel(false); });
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key === '\\') { e.preventDefault(); showPanel(side.hidden); }

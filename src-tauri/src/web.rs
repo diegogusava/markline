@@ -226,7 +226,6 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
             let mut out: Vec<(bool, String, PathBuf)> = Vec::new();
             for e in rd.flatten() {
                 let name = e.file_name().to_string_lossy().into_owned();
-                if name.starts_with('.') { continue; }
                 let full = e.path();
                 let is_dir = match std::fs::metadata(&full) { Ok(m) => m.is_dir(), Err(_) => continue };
                 if is_dir { if matches!(name.as_str(), "node_modules" | "target" | "dist" | "build") { continue; } }
@@ -236,7 +235,7 @@ fn api(st: &State, cmd: &str, a: &Value) -> Result<Value, E> {
                 out.push((is_dir, name, full));
             }
             out.sort_by(|x, y| y.0.cmp(&x.0).then(x.1.to_lowercase().cmp(&y.1.to_lowercase())));
-            Ok(Value::Array(out.into_iter().map(|(d, n, p)| json!({"name": n, "path": p.to_string_lossy(), "is_dir": d})).collect()))
+            Ok(Value::Array(out.into_iter().map(|(d, n, p)| json!({"name": n, "path": p.to_string_lossy(), "is_dir": d, "is_symlink": p.is_symlink()})).collect()))
         }
         "read_file" => {
             let f = resolve(&st.root, &path("path"), false)?;

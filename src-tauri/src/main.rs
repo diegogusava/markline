@@ -52,7 +52,7 @@ fn notes_of(p: &Path) -> Option<std::path::PathBuf> {
 }
 
 #[derive(Serialize)]
-struct Entry { name: String, path: String, is_dir: bool }
+struct Entry { name: String, path: String, is_dir: bool, is_symlink: bool }
 
 #[tauri::command]
 async fn pick_folder(app: tauri::AppHandle, start: Option<String>) -> Result<Option<String>, String> {
@@ -70,7 +70,6 @@ fn list_dir(path: String) -> Result<Vec<Entry>, String> {
     for e in std::fs::read_dir(&path).map_err(|e| e.to_string())? {
         let e = match e { Ok(e) => e, Err(_) => continue };
         let name = e.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') { continue; }
         let p = e.path();
         let is_dir = p.is_dir();
         if is_dir {
@@ -80,7 +79,7 @@ fn list_dir(path: String) -> Result<Vec<Entry>, String> {
             if !matches!(ext.as_str(), "md" | "markdown" | "txt") { continue; }
             if notes_of(&p).map_or(false, |b| b.is_file()) { continue; }
         }
-        out.push(Entry { name, path: p.to_string_lossy().into_owned(), is_dir });
+        out.push(Entry { is_symlink: e.file_type().map(|t| t.is_symlink()).unwrap_or(false), name, path: p.to_string_lossy().into_owned(), is_dir });
     }
     out.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     Ok(out)
