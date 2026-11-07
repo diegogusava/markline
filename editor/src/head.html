@@ -442,9 +442,23 @@ body.resizing { cursor: col-resize; user-select: none; }
 .shrow output { width: 48px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 .shurl { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg); }
 .shurl code { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; background: none; }
+#findbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 8px; border-top: 1px solid var(--border); }
+#findbar[hidden] { display: none; }
+#findQuery { flex: 1; min-width: 100px; width: 180px; font: inherit; color: var(--fg); background: var(--page); border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 8px; }
+#findQuery::placeholder { color: var(--muted); }
+#findStatus { font-size: 12px; font-variant-numeric: tabular-nums; }
+#findSource { position: absolute; overflow: hidden; pointer-events: none; user-select: none; }
+#findSource[hidden] { display: none; }
+#findSource > div { box-sizing: border-box; width: 100%; white-space: pre-wrap; overflow-wrap: break-word; color: transparent; }
+#findSource mark { color: transparent; background: var(--accent-soft); }
+#findSource mark.active { outline: 1px solid var(--accent); }
+#src { position: relative; }
+::highlight(find-match) { background: var(--accent-soft); color: var(--fg); }
+::highlight(find-active) { background: var(--accent); color: var(--page); }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
   <symbol id="i-logo" viewBox="0 0 24 24"><path d="M5 16V5l7 7 7-7v11M4 20h16"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
   <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
@@ -493,6 +507,7 @@ body.resizing { cursor: col-resize; user-select: none; }
         <button class="btn ghost" id="bNotes" type="button" title="Add notes for this file (Ctrl+Alt+N)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-note"/></svg><span>Notes</span><span id="bNotesDot" class="ndot" hidden></span></button>
         <button class="btn ghost" id="bRead" type="button" hidden title="Readability: color hard sentences, adverbs, passive voice and complex phrases, like the Hemingway editor (Ctrl+Alt+R)" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-read"/></svg><span>Readability</span></button>
         <button class="btn ghost icon" id="bShare" type="button" title="Share: use this app from your phone or another computer" aria-label="Share" hidden><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-phone"/></svg></button>
+        <button class="btn ghost icon" id="bFind" type="button" title="Find in document (Ctrl+F)" aria-label="Find in document" aria-controls="findbar" aria-expanded="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-search"/></svg></button>
         <button class="btn ghost icon" id="bSet" type="button" title="Settings (Ctrl+,)" aria-label="Settings" aria-pressed="false"><svg class="ic" width="16" height="16" aria-hidden="true"><use href="#i-gear"/></svg></button>
       </div>
       <button class="btn primary" id="bSave" type="button" title="Save (Ctrl+S)">Save</button>
@@ -533,6 +548,14 @@ body.resizing { cursor: col-resize; user-select: none; }
           <button type="button" data-tool="d:cls"><b>Class</b><small>Classes and members</small></button>
         </div>
       </details>
+    </div>
+    <div class="wrap" id="findbar" role="search" aria-label="Find in document" hidden>
+      <label for="findQuery">Find</label>
+      <input id="findQuery" type="search" placeholder="Find in document…" autocomplete="off" spellcheck="false" aria-describedby="findStatus">
+      <span id="findStatus" role="status" aria-live="polite"></span>
+      <button class="btn sm" id="findPrev" type="button" title="Previous match (Shift+Enter)" disabled>Previous</button>
+      <button class="btn sm" id="findNext" type="button" title="Next match (Enter)" disabled>Next</button>
+      <button class="btn sm" id="findClose" type="button" title="Close search (Escape)">Close</button>
     </div>
     <div class="wrap" id="confirm" hidden>
       <span id="confirmText"></span>

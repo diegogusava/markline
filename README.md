@@ -72,6 +72,7 @@ sudo install -m755 src-tauri/target/release/markline /usr/local/bin/
 | Open a folder | **Open...** in the side panel (the last folder is remembered) |
 | Insert a diagram | **Diagram** menu in the format bar |
 | Text size | `Ctrl` + `-` / `=` / `0`, `Ctrl` + wheel, or **Settings** |
+| Find in the document; next / previous match | **Ctrl+F**; **Enter** / **Shift+Enter** (Esc closes) |
 | Theme, fonts, line numbers, page width | **Settings** (gear icon, `Ctrl+,`) |
 | Undo, redo, history | arrow icons and the clock icon, or `Ctrl+Z` / `Ctrl+Shift+Z` |
 | Indent | `Tab` / `Shift+Tab`: nests list items, moves between table cells (the last cell adds a row), indents code and Source lines |
